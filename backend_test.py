@@ -1,443 +1,376 @@
 #!/usr/bin/env python3
-"""Backend API tests for HR Digital Services app - Round 3: SEO edit, Full edit, Promo cleanup, Channel settings"""
+"""
+Backend API test for HR Digital Services - Bug Fix Verification
+Tests the fix for ManualVacancyIn.description max_length (20000 -> 200000)
+"""
+import os
+import sys
 import requests
-import json
-import time
-from urllib.parse import quote
+from pathlib import Path
 
-# Base URL from frontend env
-BASE_URL = "https://copy-manager-5.preview.emergentagent.com/api"
+# Read backend URL from frontend/.env
+env_path = Path("/app/frontend/.env")
+BACKEND_URL = None
+if env_path.exists():
+    for line in env_path.read_text().splitlines():
+        if line.startswith("REACT_APP_BACKEND_URL="):
+            BACKEND_URL = line.split("=", 1)[1].strip()
+            break
 
-# Admin credentials
-ADMIN_EMAIL = "admin@hrdigitalservices.in"
-ADMIN_PASSWORD = "Admin@12345"
+if not BACKEND_URL:
+    print("❌ ERROR: Could not read REACT_APP_BACKEND_URL from /app/frontend/.env")
+    sys.exit(1)
 
-# Test results
-results = {
-    "passed": [],
-    "failed": [],
-}
+BASE_URL = f"{BACKEND_URL}/api"
+print(f"🔗 Testing backend at: {BASE_URL}\n")
 
-def log_pass(test_name, details=""):
-    print(f"✅ PASS: {test_name}")
-    if details:
-        print(f"   {details}")
-    results["passed"].append(test_name)
+# Admin credentials from review request
+ADMIN_EMAIL = "hrdigitalservices.in@gmail.com"
+ADMIN_PASSWORD = "Dev@3642"
 
-def log_fail(test_name, details=""):
-    print(f"❌ FAIL: {test_name}")
-    if details:
-        print(f"   {details}")
-    results["failed"].append(test_name)
+# Test results tracking
+tests_passed = 0
+tests_failed = 0
+test_details = []
 
-def admin_login():
-    """Login as admin and return session"""
-    session = requests.Session()
-    resp = session.post(f"{BASE_URL}/auth/login", json={
-        "email": ADMIN_EMAIL,
-        "password": ADMIN_PASSWORD
-    })
-    if resp.status_code == 200:
-        print(f"✓ Admin login successful")
-        return session
+def log_test(name, passed, details=""):
+    global tests_passed, tests_failed
+    if passed:
+        tests_passed += 1
+        status = "✅ PASS"
     else:
-        print(f"✗ Admin login failed: {resp.status_code} - {resp.text}")
+        tests_failed += 1
+        status = "❌ FAIL"
+    msg = f"{status}: {name}"
+    if details:
+        msg += f" - {details}"
+    print(msg)
+    test_details.append({"name": name, "passed": passed, "details": details})
+
+def test_admin_login():
+    """Test 1: Admin login with provided credentials"""
+    print("\n" + "="*80)
+    print("TEST 1: Admin Login")
+    print("="*80)
+    
+    try:
+        response = requests.post(
+            f"{BASE_URL}/auth/login",
+            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+            timeout=30
+        )
+        
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Check if we got a token or success indicator
+            has_token = "access_token" in data or "token" in data
+            has_cookies = bool(response.cookies)
+            
+            if has_token or has_cookies:
+                log_test("Admin login", True, f"Status 200, auth mechanism present")
+                return response.cookies
+            else:
+                log_test("Admin login", False, f"Status 200 but no token/cookies in response")
+                return None
+        else:
+            log_test("Admin login", False, f"Status {response.status_code}: {response.text[:200]}")
+            return None
+            
+    except Exception as e:
+        log_test("Admin login", False, f"Exception: {str(e)}")
         return None
 
-def test_seo_edit_converts_to_manual():
-    """Test 1: SEO edit converts a scraped API post → manual (protects from shuffle)"""
+def test_list_scraped_vacancies(cookies):
+    """Test 2: List scraped/API vacancies and pick one"""
     print("\n" + "="*80)
-    print("TEST 1: SEO EDIT CONVERTS SCRAPED POST TO MANUAL")
+    print("TEST 2: List Scraped Vacancies")
     print("="*80)
     
-    admin_session = admin_login()
-    if not admin_session:
-        log_fail("SEO edit test", "Admin login failed")
-        return
-    
-    # Step 1: GET /api/admin/vacancies-seo and find an item with source != "manual"
-    print("\n--- Step 1: Finding a scraped vacancy ---")
-    resp = admin_session.get(f"{BASE_URL}/admin/vacancies-seo?per_page=50")
-    
-    if resp.status_code != 200:
-        log_fail("GET /api/admin/vacancies-seo", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    data = resp.json()
-    items = data.get("items", [])
-    
-    # Find a scraped vacancy (source != "manual")
-    scraped_vacancy = None
-    for item in items:
-        if item.get("source") != "manual":
-            scraped_vacancy = item
-            break
-    
-    if not scraped_vacancy:
-        log_fail("Find scraped vacancy", "No scraped vacancies found (all are manual)")
-        return
-    
-    vacancy_id = scraped_vacancy.get("id")
-    original_seo_title = scraped_vacancy.get("seo_title", "")
-    original_source = scraped_vacancy.get("source", "")
-    
-    log_pass("Find scraped vacancy", 
-            f"Found vacancy ID={vacancy_id}, source={original_source}, seo_title={original_seo_title[:50]}...")
-    
-    # Step 2: PUT /api/admin/vacancies/{id}/seo with custom SEO
-    print("\n--- Step 2: Updating SEO (should convert to manual) ---")
-    custom_seo_title = "MYCUSTOM SEO TITLE"
-    custom_seo_desc = "my desc"
-    
-    seo_payload = {
-        "seo_title": custom_seo_title,
-        "seo_description": custom_seo_desc
-    }
-    
-    resp = admin_session.put(f"{BASE_URL}/admin/vacancies/{vacancy_id}/seo", json=seo_payload)
-    
-    if resp.status_code != 200:
-        log_fail("PUT /api/admin/vacancies/{id}/seo", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    log_pass("PUT /api/admin/vacancies/{id}/seo", "SEO update successful")
-    
-    # Step 3: GET /api/vacancies/{id} and verify source is now "manual" and seo_title is custom
-    print("\n--- Step 3: Verifying source changed to 'manual' and SEO persisted ---")
-    resp = requests.get(f"{BASE_URL}/vacancies/{vacancy_id}")
-    
-    if resp.status_code != 200:
-        log_fail("GET /api/vacancies/{id} after SEO edit", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    updated_vacancy = resp.json()
-    new_source = updated_vacancy.get("source", "")
-    new_seo_title = updated_vacancy.get("seo_title", "")
-    
-    if new_source == "manual":
-        log_pass("Source converted to manual", f"source={new_source} (was {original_source})")
-    else:
-        log_fail("Source converted to manual", f"Expected 'manual', got '{new_source}'")
-    
-    if new_seo_title == custom_seo_title:
-        log_pass("SEO title persisted", f"seo_title={new_seo_title}")
-    else:
-        log_fail("SEO title persisted", f"Expected '{custom_seo_title}', got '{new_seo_title}'")
-    
-    # Step 4: POST /api/admin/vacancies/shuffle-seo and verify this vacancy is NOT touched
-    print("\n--- Step 4: Running shuffle-seo (should NOT touch manual posts) ---")
-    resp = admin_session.post(f"{BASE_URL}/admin/vacancies/shuffle-seo")
-    
-    if resp.status_code != 200:
-        log_fail("POST /api/admin/vacancies/shuffle-seo", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    shuffle_data = resp.json()
-    shuffled_count = shuffle_data.get("shuffled", 0)
-    log_pass("POST /api/admin/vacancies/shuffle-seo", f"Shuffled {shuffled_count} vacancies")
-    
-    # Step 5: GET /api/vacancies/{id} again and verify seo_title is STILL the custom one
-    print("\n--- Step 5: Verifying SEO title unchanged after shuffle ---")
-    resp = requests.get(f"{BASE_URL}/vacancies/{vacancy_id}")
-    
-    if resp.status_code != 200:
-        log_fail("GET /api/vacancies/{id} after shuffle", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    final_vacancy = resp.json()
-    final_seo_title = final_vacancy.get("seo_title", "")
-    
-    if final_seo_title == custom_seo_title:
-        log_pass("SEO title protected from shuffle", 
-                f"seo_title still '{custom_seo_title}' (shuffle did not overwrite)")
-    else:
-        log_fail("SEO title protected from shuffle", 
-                f"Expected '{custom_seo_title}', got '{final_seo_title}' (shuffle overwrote it!)")
-
-def test_full_edit_converts_to_manual():
-    """Test 2: Full edit converts a scraped API post → manual"""
-    print("\n" + "="*80)
-    print("TEST 2: FULL EDIT CONVERTS SCRAPED POST TO MANUAL")
-    print("="*80)
-    
-    admin_session = admin_login()
-    if not admin_session:
-        log_fail("Full edit test", "Admin login failed")
-        return
-    
-    # Step 1: GET /api/admin/vacancies-seo and find ANOTHER scraped vacancy
-    print("\n--- Step 1: Finding another scraped vacancy ---")
-    resp = admin_session.get(f"{BASE_URL}/admin/vacancies-seo?per_page=50")
-    
-    if resp.status_code != 200:
-        log_fail("GET /api/admin/vacancies-seo", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    data = resp.json()
-    items = data.get("items", [])
-    
-    # Find a scraped vacancy (source != "manual"), skip the first one (used in test 1)
-    scraped_vacancies = [item for item in items if item.get("source") != "manual"]
-    
-    if len(scraped_vacancies) < 2:
-        log_fail("Find second scraped vacancy", "Not enough scraped vacancies (need at least 2)")
-        # Use the first one if we only have one
-        if scraped_vacancies:
-            scraped_vacancy = scraped_vacancies[0]
-        else:
-            return
-    else:
-        scraped_vacancy = scraped_vacancies[1]  # Use second one
-    
-    vacancy_id = scraped_vacancy.get("id")
-    original_source = scraped_vacancy.get("source", "")
-    original_title = scraped_vacancy.get("title", "")
-    
-    log_pass("Find second scraped vacancy", 
-            f"Found vacancy ID={vacancy_id}, source={original_source}, title={original_title[:50]}...")
-    
-    # Step 2: PUT /api/admin/vacancies/{id} with full edit
-    print("\n--- Step 2: Full edit (should convert to manual) ---")
-    
-    edit_payload = {
-        "title": "Edited Full Title",
-        "organization": "My Org",
-        "category": "other",
-        "tags": ["tagx"],
-        "important_links": [
-            {
-                "label": "Official",
-                "url": "https://example.gov.in",
-                "type": "link"
-            }
-        ]
-    }
-    
-    resp = admin_session.put(f"{BASE_URL}/admin/vacancies/{vacancy_id}", json=edit_payload)
-    
-    if resp.status_code != 200:
-        log_fail("PUT /api/admin/vacancies/{id}", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    log_pass("PUT /api/admin/vacancies/{id}", "Full edit successful")
-    
-    # Step 3: GET /api/vacancies/{id} and verify changes
-    print("\n--- Step 3: Verifying full edit persisted and source is 'manual' ---")
-    resp = requests.get(f"{BASE_URL}/vacancies/{vacancy_id}")
-    
-    if resp.status_code != 200:
-        log_fail("GET /api/vacancies/{id} after full edit", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    updated_vacancy = resp.json()
-    new_source = updated_vacancy.get("source", "")
-    new_title = updated_vacancy.get("title", "")
-    new_tags = updated_vacancy.get("tags", [])
-    new_links = updated_vacancy.get("important_links", [])
-    
-    # Verify source is manual
-    if new_source == "manual":
-        log_pass("Source converted to manual (full edit)", f"source={new_source} (was {original_source})")
-    else:
-        log_fail("Source converted to manual (full edit)", f"Expected 'manual', got '{new_source}'")
-    
-    # Verify title
-    if new_title == "Edited Full Title":
-        log_pass("Title updated", f"title={new_title}")
-    else:
-        log_fail("Title updated", f"Expected 'Edited Full Title', got '{new_title}'")
-    
-    # Verify tags
-    if new_tags == ["tagx"]:
-        log_pass("Tags updated", f"tags={new_tags}")
-    else:
-        log_fail("Tags updated", f"Expected ['tagx'], got {new_tags}")
-    
-    # Verify important_links
-    if len(new_links) >= 1:
-        official_link = None
-        for link in new_links:
-            if link.get("label") == "Official":
-                official_link = link
-                break
+    try:
+        response = requests.get(
+            f"{BASE_URL}/admin/vacancies-seo?page=1&per_page=20",
+            cookies=cookies,
+            timeout=30
+        )
         
-        if official_link:
-            if (official_link.get("url") == "https://example.gov.in" and 
-                official_link.get("type") == "link"):
-                log_pass("Important links updated", f"Official link present: {official_link}")
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("items", [])
+            
+            if not items:
+                log_test("List scraped vacancies", False, "No vacancies returned")
+                return None
+            
+            # Find a scraped vacancy (source != "manual")
+            scraped = None
+            for item in items:
+                if item.get("source") != "manual":
+                    scraped = item
+                    break
+            
+            if scraped:
+                log_test("List scraped vacancies", True, 
+                        f"Found {len(items)} vacancies, picked scraped ID: {scraped['id']}, source: {scraped.get('source')}")
+                return scraped
             else:
-                log_fail("Important links updated", f"Official link mismatch: {official_link}")
+                log_test("List scraped vacancies", False, "No scraped vacancies found (all are manual)")
+                return None
         else:
-            log_fail("Important links updated", "Official link not found in important_links")
-    else:
-        log_fail("Important links updated", f"Expected at least 1 link, got {len(new_links)}")
+            log_test("List scraped vacancies", False, f"Status {response.status_code}: {response.text[:200]}")
+            return None
+            
+    except Exception as e:
+        log_test("List scraped vacancies", False, f"Exception: {str(e)}")
+        return None
 
-def test_promo_cleanup():
-    """Test 3: Promo cleanup endpoint"""
+def test_get_vacancy_detail(vacancy_id):
+    """Test 2b: Get full vacancy details"""
     print("\n" + "="*80)
-    print("TEST 3: PROMO CLEANUP ENDPOINT")
+    print("TEST 2b: Get Vacancy Detail")
     print("="*80)
     
-    # Test 3.1: Without admin auth - should get 401/403
-    print("\n--- Step 1: Testing without auth (should fail) ---")
-    resp = requests.post(f"{BASE_URL}/admin/vacancies/clean-promo")
-    
-    if resp.status_code in [401, 403]:
-        log_pass("POST /api/admin/vacancies/clean-promo (no auth)", 
-                f"Correctly rejected with {resp.status_code}")
-    else:
-        log_fail("POST /api/admin/vacancies/clean-promo (no auth)", 
-                f"Expected 401/403, got {resp.status_code}")
-    
-    # Test 3.2: With admin auth - should return {ok: true, cleaned: <int>}
-    print("\n--- Step 2: Testing with admin auth ---")
-    admin_session = admin_login()
-    if not admin_session:
-        log_fail("Promo cleanup test", "Admin login failed")
-        return
-    
-    resp = admin_session.post(f"{BASE_URL}/admin/vacancies/clean-promo")
-    
-    if resp.status_code != 200:
-        log_fail("POST /api/admin/vacancies/clean-promo (with auth)", 
-                f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    data = resp.json()
-    
-    # Verify response structure
-    if "ok" not in data:
-        log_fail("Promo cleanup response", "Missing 'ok' field")
-        return
-    
-    if "cleaned" not in data:
-        log_fail("Promo cleanup response", "Missing 'cleaned' field")
-        return
-    
-    if not isinstance(data["cleaned"], int):
-        log_fail("Promo cleanup response", f"'cleaned' should be int, got {type(data['cleaned'])}")
-        return
-    
-    log_pass("POST /api/admin/vacancies/clean-promo (with auth)", 
-            f"Success: ok={data['ok']}, cleaned={data['cleaned']}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/vacancies/{vacancy_id}",
+            timeout=30
+        )
+        
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            log_test("Get vacancy detail", True, 
+                    f"Retrieved vacancy: {data.get('title', '')[:50]}...")
+            return data
+        else:
+            log_test("Get vacancy detail", False, f"Status {response.status_code}: {response.text[:200]}")
+            return None
+            
+    except Exception as e:
+        log_test("Get vacancy detail", False, f"Exception: {str(e)}")
+        return None
 
-def test_channel_link_settings():
-    """Test 4: Channel link settings"""
+def test_edit_with_long_description(vacancy_id, vacancy_data, cookies):
+    """Test 3: THE KEY TEST - Edit vacancy with LONG description (~30000 chars)"""
     print("\n" + "="*80)
-    print("TEST 4: CHANNEL LINK SETTINGS")
+    print("TEST 3: Edit Vacancy with LONG Description (~30000 chars)")
+    print("="*80)
+    print("This is the KEY BUG FIX TEST - should now succeed (200), not 422")
+    
+    # Create a long description (~30000 characters)
+    long_description = "<h2>Detailed Job Description</h2>\n"
+    long_description += "<p>This is a comprehensive job posting with extensive details about the position, requirements, and application process.</p>\n"
+    
+    # Add repetitive content to reach ~30000 chars
+    section_template = """
+    <h3>Section {num}: Important Information</h3>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+    Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+    <ul>
+        <li>Qualification requirement {num}.1: Graduate degree in relevant field</li>
+        <li>Qualification requirement {num}.2: Minimum 2 years of experience</li>
+        <li>Qualification requirement {num}.3: Age limit between 18-35 years</li>
+        <li>Qualification requirement {num}.4: Valid government ID proof required</li>
+        <li>Qualification requirement {num}.5: Computer literacy certificate mandatory</li>
+    </ul>
+    <p>Additional details about the application process, selection criteria, and important dates. 
+    Candidates must ensure they meet all eligibility criteria before applying. 
+    The selection process will include written examination, skill test, and personal interview rounds.</p>
+    """
+    
+    for i in range(1, 51):  # 50 sections to reach ~30000 chars
+        long_description += section_template.format(num=i)
+    
+    print(f"Generated description length: {len(long_description)} characters")
+    
+    # Prepare the payload - use existing vacancy data as base
+    payload = {
+        "title": vacancy_data.get("title", "Test Vacancy Title"),
+        "organization": vacancy_data.get("organization", "Test Organization"),
+        "category": vacancy_data.get("category", "other"),
+        "description": long_description  # THE KEY FIELD - long description
+    }
+    
+    try:
+        response = requests.put(
+            f"{BASE_URL}/admin/vacancies/{vacancy_id}",
+            json=payload,
+            cookies=cookies,
+            timeout=60  # Longer timeout for large payload
+        )
+        
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            log_test("Edit with long description", True, 
+                    f"✅ SUCCESS! Status 200 - Long description accepted (bug fix working)")
+            return True
+        elif response.status_code == 422:
+            error_detail = response.json().get("detail", "")
+            log_test("Edit with long description", False, 
+                    f"❌ BUG NOT FIXED! Status 422 (validation error): {error_detail}")
+            return False
+        else:
+            log_test("Edit with long description", False, 
+                    f"Status {response.status_code}: {response.text[:500]}")
+            return False
+            
+    except Exception as e:
+        log_test("Edit with long description", False, f"Exception: {str(e)}")
+        return False
+
+def test_verify_saved_description(vacancy_id, cookies):
+    """Test 3b: Verify the long description was saved"""
+    print("\n" + "="*80)
+    print("TEST 3b: Verify Saved Description")
     print("="*80)
     
-    # Test 4.1: PUT without admin auth - should get 401/403
-    print("\n--- Step 1: Testing PUT without auth (should fail) ---")
-    settings_payload = {
-        "channel_whatsapp": "https://whatsapp.com/channel/test",
-        "channel_telegram": "https://t.me/test"
+    try:
+        response = requests.get(
+            f"{BASE_URL}/vacancies/{vacancy_id}",
+            timeout=30
+        )
+        
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Check content_html field (where full description is stored)
+            content_html = data.get("content_html", "")
+            structured_desc = data.get("structured", {}).get("description", "")
+            
+            # Either field should have the long description
+            desc_length = max(len(content_html), len(structured_desc))
+            
+            print(f"content_html length: {len(content_html)} chars")
+            print(f"structured.description length: {len(structured_desc)} chars")
+            
+            if desc_length > 20000:
+                log_test("Verify saved description", True, 
+                        f"Description saved correctly, length: {desc_length} chars (in content_html/structured.description)")
+                return True
+            else:
+                log_test("Verify saved description", False, 
+                        f"Description too short: {desc_length} chars (expected >20000)")
+                return False
+        else:
+            log_test("Verify saved description", False, f"Status {response.status_code}")
+            return False
+            
+    except Exception as e:
+        log_test("Verify saved description", False, f"Exception: {str(e)}")
+        return False
+
+def test_validation_still_works(vacancy_id, cookies):
+    """Test 4: Validation error check - send invalid payload"""
+    print("\n" + "="*80)
+    print("TEST 4: Validation Still Works (Invalid Payload)")
+    print("="*80)
+    print("Testing that validation errors are still properly returned")
+    
+    # Send invalid payload: title="" violates min_length=3
+    invalid_payload = {
+        "title": "",  # Invalid: min_length=3
+        "organization": "Test Org",
+        "category": "other"
     }
     
-    resp = requests.put(f"{BASE_URL}/admin/site-settings", json=settings_payload)
-    
-    if resp.status_code in [401, 403]:
-        log_pass("PUT /api/admin/site-settings (no auth)", 
-                f"Correctly rejected with {resp.status_code}")
-    else:
-        log_fail("PUT /api/admin/site-settings (no auth)", 
-                f"Expected 401/403, got {resp.status_code}")
-    
-    # Test 4.2: PUT with admin auth
-    print("\n--- Step 2: Testing PUT with admin auth ---")
-    admin_session = admin_login()
-    if not admin_session:
-        log_fail("Channel settings test", "Admin login failed")
-        return
-    
-    test_whatsapp = "https://whatsapp.com/channel/abc"
-    test_telegram = "https://t.me/mychan"
-    
-    settings_payload = {
-        "channel_whatsapp": test_whatsapp,
-        "channel_telegram": test_telegram
-    }
-    
-    resp = admin_session.put(f"{BASE_URL}/admin/site-settings", json=settings_payload)
-    
-    if resp.status_code != 200:
-        log_fail("PUT /api/admin/site-settings (with auth)", 
-                f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    log_pass("PUT /api/admin/site-settings (with auth)", "Settings updated successfully")
-    
-    # Test 4.3: GET /api/site-settings and verify
-    print("\n--- Step 3: Testing GET /api/site-settings (public) ---")
-    resp = requests.get(f"{BASE_URL}/site-settings")
-    
-    if resp.status_code != 200:
-        log_fail("GET /api/site-settings", f"Status {resp.status_code}: {resp.text}")
-        return
-    
-    data = resp.json()
-    
-    # Verify required keys are present
-    required_keys = [
-        "channel_whatsapp", "channel_telegram", "channel_arattai",
-        "channel_youtube", "channel_instagram", "channel_app"
-    ]
-    
-    missing_keys = [k for k in required_keys if k not in data]
-    
-    if missing_keys:
-        log_fail("GET /api/site-settings (keys)", f"Missing keys: {missing_keys}")
-    else:
-        log_pass("GET /api/site-settings (keys)", 
-                f"All required keys present: {required_keys}")
-    
-    # Verify the values we just set
-    returned_whatsapp = data.get("channel_whatsapp", "")
-    returned_telegram = data.get("channel_telegram", "")
-    
-    if returned_whatsapp == test_whatsapp:
-        log_pass("GET /api/site-settings (channel_whatsapp)", 
-                f"channel_whatsapp={returned_whatsapp}")
-    else:
-        log_fail("GET /api/site-settings (channel_whatsapp)", 
-                f"Expected '{test_whatsapp}', got '{returned_whatsapp}'")
-    
-    if returned_telegram == test_telegram:
-        log_pass("GET /api/site-settings (channel_telegram)", 
-                f"channel_telegram={returned_telegram}")
-    else:
-        log_fail("GET /api/site-settings (channel_telegram)", 
-                f"Expected '{test_telegram}', got '{returned_telegram}'")
+    try:
+        response = requests.put(
+            f"{BASE_URL}/admin/vacancies/{vacancy_id}",
+            json=invalid_payload,
+            cookies=cookies,
+            timeout=30
+        )
+        
+        print(f"Status: {response.status_code}")
+        
+        if response.status_code == 422:
+            data = response.json()
+            has_detail = "detail" in data
+            
+            if has_detail:
+                detail = data["detail"]
+                is_array = isinstance(detail, list)
+                log_test("Validation error check", True, 
+                        f"Status 422 with detail field (array: {is_array})")
+                return True
+            else:
+                log_test("Validation error check", False, 
+                        f"Status 422 but no 'detail' field in response")
+                return False
+        else:
+            log_test("Validation error check", False, 
+                    f"Expected 422, got {response.status_code}: {response.text[:200]}")
+            return False
+            
+    except Exception as e:
+        log_test("Validation error check", False, f"Exception: {str(e)}")
+        return False
 
 def main():
     print("="*80)
-    print("HR DIGITAL SERVICES - BACKEND API TESTS (ROUND 3)")
-    print("="*80)
-    print(f"Base URL: {BASE_URL}")
-    print(f"Admin: {ADMIN_EMAIL}")
+    print("HR DIGITAL SERVICES - BUG FIX VERIFICATION TEST")
+    print("Bug: ManualVacancyIn.description max_length 20000 -> 200000")
     print("="*80)
     
-    # Run all tests
-    test_seo_edit_converts_to_manual()
-    test_full_edit_converts_to_manual()
-    test_promo_cleanup()
-    test_channel_link_settings()
+    # Test 1: Admin login
+    cookies = test_admin_login()
+    if not cookies:
+        print("\n❌ CRITICAL: Admin login failed. Cannot proceed with other tests.")
+        return
+    
+    # Test 2: List scraped vacancies
+    scraped_vacancy = test_list_scraped_vacancies(cookies)
+    if not scraped_vacancy:
+        print("\n❌ CRITICAL: Could not find scraped vacancy. Cannot proceed with edit tests.")
+        return
+    
+    vacancy_id = scraped_vacancy["id"]
+    
+    # Test 2b: Get full vacancy details
+    vacancy_data = test_get_vacancy_detail(vacancy_id)
+    if not vacancy_data:
+        print("\n⚠️  WARNING: Could not get vacancy details. Using scraped data for edit test.")
+        vacancy_data = scraped_vacancy
+    
+    # Test 3: THE KEY TEST - Edit with long description
+    edit_success = test_edit_with_long_description(vacancy_id, vacancy_data, cookies)
+    
+    if edit_success:
+        # Test 3b: Verify saved description
+        test_verify_saved_description(vacancy_id, cookies)
+    
+    # Test 4: Validation still works
+    test_validation_still_works(vacancy_id, cookies)
     
     # Summary
     print("\n" + "="*80)
     print("TEST SUMMARY")
     print("="*80)
-    print(f"✅ PASSED: {len(results['passed'])}")
-    print(f"❌ FAILED: {len(results['failed'])}")
-    
-    if results['failed']:
-        print("\nFailed tests:")
-        for test in results['failed']:
-            print(f"  - {test}")
-    
+    print(f"✅ Passed: {tests_passed}")
+    print(f"❌ Failed: {tests_failed}")
+    print(f"📊 Total:  {tests_passed + tests_failed}")
     print("="*80)
     
-    return 0 if not results['failed'] else 1
+    if tests_failed == 0:
+        print("\n🎉 ALL TESTS PASSED! Bug fix verified successfully.")
+    else:
+        print(f"\n⚠️  {tests_failed} test(s) failed. Review details above.")
+    
+    print("\nDetailed Results:")
+    for i, test in enumerate(test_details, 1):
+        status = "✅" if test["passed"] else "❌"
+        print(f"{i}. {status} {test['name']}")
+        if test["details"]:
+            print(f"   {test['details']}")
 
 if __name__ == "__main__":
-    exit(main())
+    main()

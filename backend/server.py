@@ -977,7 +977,7 @@ class ManualVacancyIn(BaseModel):
     state: Optional[str] = Field(None, max_length=40)        # canonical slug (e.g. haryana, delhi)
     last_date_text: Optional[str] = Field(None, max_length=80)
     apply_url: Optional[str] = Field(None, max_length=500)   # external "Apply Now" link
-    description: Optional[str] = Field(None, max_length=20000)  # simple HTML / markdown-ish text
+    description: Optional[str] = Field(None, max_length=200000)  # simple HTML / markdown-ish text (scraped posts can be long)
     total_posts: Optional[str] = Field(None, max_length=40)
     seo_title: Optional[str] = Field(None, max_length=200)
     focus_keyword: Optional[str] = Field(None, max_length=120)

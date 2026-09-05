@@ -6,7 +6,7 @@
 import axios from "axios";
 
 const KEY = "he_admin_token_v1";
-import { BACKEND_URL } from "@/lib/api";
+import { BACKEND_URL, normalizeAxiosError } from "@/lib/api";
 export const ADMIN_API = `${BACKEND_URL}/api`;
 
 export const getAdminToken = () => {
@@ -46,6 +46,6 @@ adminApi.interceptors.response.use(
     if (err?.response?.status === 401) {
       clearAdminToken();
     }
-    return Promise.reject(err);
+    return Promise.reject(normalizeAxiosError(err));
   }
 );
