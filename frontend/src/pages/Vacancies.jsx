@@ -326,7 +326,7 @@ const Vacancies = () => {
                 <li key={v.id || i}>
                   <Link
                     to={`/vacancies/${v.id}`}
-                    className="nu-card group"
+                    className={`nu-card group nu-c${i % 6}`}
                     data-testid={`new-update-${i}`}
                   >
                     <div className="flex items-start gap-3">
