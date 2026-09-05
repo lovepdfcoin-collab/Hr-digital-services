@@ -1,0 +1,24 @@
+{
+  "summary": "Verified all three bug fixes. BACKEND: POST /api/vacancy-alerts/subscribe returns 200 {ok:true, unsubscribe_token}, subscription persists (GET /api/vacancy-alerts/status -> subscribed:true), and backend logs show real Resend delivery ('Email sent via Resend to delivered@resend.dev ... id=ee7f4013-...') — no DEV MODE fallback. Invalid email -> 422, no filters -> 400. FRONTEND: header topbar-contact-btn href=https://wa.me/918168762016?text=<hindi msg>, target=_blank, click opens popup at api.whatsapp.com/send/?phone=918168762016 — works. JobAlertSubscribe expand -> email delivered@resend.dev -> SSC -> submit shows job-alert-success ('अलर्ट चालू हो गया ✔'). Push button with stubbed Notification.requestPermission='granted': exactly ONE toast, data-type=success, text 'Push Alerts ON — nayi bharti aate hi notification milegi.' and push-subscribe-status 'Push Alerts ON ✓' rendered within 1.5s. Iteration-4 wrong-error-toast defect is resolved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Homepage (all pages)", "issues": ["Pre-existing, unrelated pageerror on load: \"Unexpected token 'E', \\\"Error 4: S\\\"... is not valid JSON\" — a third-party script (likely Webpushr with placeholder site key) parsing a plain-text error as JSON. Harmless to flows tested but pollutes console; consider removing/guarding the SDK until a real key is set.", "In real Chromium the notification permission is natively 'denied', so the button renders 'Push Blocked — Settings देखें' — expected behaviour, not a bug."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_vacancy_alerts_email.py", "/app/test_reports/pytest/vacancy_alerts.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "emails.py docstring still says 'Uses SMTP if all SMTP_* env vars are set, otherwise logs to console' — update to mention Resend precedence.",
+    "send_email() return type doc says mode: 'smtp'|'log' but 'resend' is now possible; keep docstrings in sync."
+  ],
+  "updated_files": ["/app/backend/tests/test_vacancy_alerts_email.py"],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "100% (3/3 flows)"},
+  "seed_data_creation": "vacancy_subscriptions doc for delivered@resend.dev (Resend test sink) created/upserted by tests",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Push-notification granted path can only be tested by stubbing window.Notification via context.add_init_script (Chromium reports 'denied' natively and grant_permissions does not change it). Use [data-sonner-toast] with data-type attribute to distinguish success vs error toasts. Only use delivered@resend.dev as email recipient. Regression pytest file: /app/backend/tests/test_vacancy_alerts_email.py (also asserts the Resend log line, so run it after backend restarts).",
+  "rca_of_the_issue": "All three previously reported defects are fixed at source: Resend branch added to emails.py send paths; header CTA changed from tel: to wa.me link with target=_blank; PushSubscribeButton isolates the webpushr handoff in its own try/catch so the SDK TypeError no longer diverts control past toast.success()."
+}

@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend-only verification of the 'Failed to load' cross-origin bug fix (dynamic same-origin BACKEND_URL in /app/frontend/src/lib/api.js). Both preview domains tested + full regression on vacancy detail, blogs, downloads, admin login, admin SEO, admin content. All checks PASS. Bug is fixed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_flows": [
+    "OLD domain (job-portal-admin-4.preview.emergentagent.com) homepage: vacancies-list = 20 cards, new-updates-section = 9 links, NO 'Failed to load' toast",
+    "CURRENT domain (a31b8a59-....preview.emergentagent.com) homepage: same-origin request works, 20 cards + 9 update links, no error toast",
+    "Vacancy detail on BOTH domains: WhatsApp summary card renders with कुल पद/योग्यता/आखरी तारीख/लिंक + copy button",
+    "/blogs on current domain: 9 blog cards render (BACKEND_URL from shared api.js)",
+    "/downloads on current domain: 5 resume/download items render (dynamic BACKEND_URL)",
+    "Admin login (/admin/login) with nyolkrish142@gmail.com / Haryana@123 → POST /api/auth/login 200 → redirect to /admin dashboard (adminAuth.js shared import works)",
+    "/admin/seo loads form (AdminSEO import of { API } from lib/api works)",
+    "/admin/content loads form (AdminContent shared import works)"
+  ],
+  "console_notes": "Only expected errors observed: (1) Webpushr CORS from bot.webpushr.com/prompt/bell (external, placeholder site key — per instructions 'Push Blocked' is expected), (2) 401 from /api/auth/me before admin login on public pages (expected — anonymous auth check). No backend-CORS or 'Failed to load' errors on either domain.",
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "lib/api.js dynamic origin logic is clean — same-origin covers all *.emergentagent.com and hrdigitalservices.* hosts, falls back to env for localhost dev. Good fix.",
+    "Consider also handling the case where localStorage he_admin_token_v1 was set under one origin but user opens the other — token is per-origin so admin will need to re-login on old domain; not a bug but worth noting for UX."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only run)", "frontend": "100%"},
+  "test_credentials": "Admin: nyolkrish142@gmail.com / Haryana@123 (localStorage he_admin_token_v1) — verified working",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Cross-origin 'Failed to load' bug FIXED via dynamic same-origin BACKEND_URL in /app/frontend/src/lib/api.js. Both preview URLs (old job-portal-admin-4 and current a31b8a59) now serve vacancies without CORS errors. Webpushr CORS console error is expected placeholder — ignore."
+}

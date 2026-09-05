@@ -1,0 +1,32 @@
+{
+  "summary": "Tested new Site Theme & Links feature end-to-end. Backend: GET /api/site-settings and PUT /api/admin/site-settings (auth, persistence, theme_updated_at stamping, lock toggle) via pytest (/app/backend/tests/test_site_settings.py) — 5/6 passed. Frontend: admin login -> /admin/site (nav admin-nav-site), theme/primary/lock/social inputs + save + persistence after reload all worked; public site adopted admin theme (body 'light-theme theme-nature has-theme', --emerald=#2f8a3b), footer showed <a target=_blank> for set links and greyed social-icon-off spans for empty ones; stale appThemeStamp forced adoption; user-chosen dracula persisted across reload; with theme_locked=true theme-palette-btn and theme-toggle-btn were absent and admin theme applied. Cleanup done: default_theme=light, default_primary='', theme_locked=false, all social links empty (verified via GET).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/admin/site-settings", "issue": "No validation of default_theme against the allowed THEME_KEYS list — 'not-a-theme' is accepted (200) and served by public GET /api/site-settings. Frontend ignores unknown values so site falls back to previous theme, but invalid data can be persisted. Same for default_primary (non-hex strings accepted; UI validates only client-side)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Visitor changes theme after admin set a default_primary", "issue": "Minor/by-design? Choosing a different theme via theme-palette-btn keeps the admin-pushed default_primary override in localStorage (appPrimary), so e.g. dracula renders with the admin's green accent until the visitor clears the primary. Confirm this is intended.", "affected_selectors": ["theme-palette-btn", "theme-opt-dracula"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_site_settings.py", "/app/test_reports/pytest/site_settings.xml"],
+  "action_items": [
+    "Optional: validate default_theme (whitelist) and default_primary (#RRGGBB) server-side in PUT /api/admin/site-settings, return 400 otherwise."
+  ],
+  "critical_code_review_comments": [
+    "update_site_settings accepts a raw dict body without Pydantic validation — add a model with a theme Literal/enum and hex regex for default_primary.",
+    "Footer.jsx and ThemeContext.js each call GET /site-settings separately on every page load (duplicate request); could be shared via ThemeContext."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "83% (5/6; single failure is the report-only theme validation check)", "frontend": "100%"},
+  "seed_data_creation": "Temporarily set site settings (nature/#2f8a3b + facebook/youtube links, then locked) for testing; all restored to defaults at the end.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin@haryanaenterprises.com / Admin@123",
+  "context_for_next_testing_agent": "Site settings tests live in /app/backend/tests/test_site_settings.py (module-scoped restore fixture resets theme to light). Public-site theme adoption depends on localStorage keys appTheme/appPrimary/appThemeStamp; admin token key is 'he_admin_token_v1'.",
+  "rca_of_the_issue": "Only defect found: PUT /api/admin/site-settings coerces every field to a trimmed string with no whitelist, so arbitrary default_theme values persist; ThemeContext guards with THEME_KEYS so no visible breakage."
+}
