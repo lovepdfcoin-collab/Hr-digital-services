@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { FaPlus, FaEdit, FaTrash, FaSave, FaImage, FaArrowLeft } from "react-icons/fa";
 import { adminApi } from "./adminAuth";
 import { BACKEND_URL } from "@/lib/api";
+import { IMAGE_PRESETS, getPreset, cropImageToSize } from "@/lib/imagePresets";
 
 const inputCls =
   "w-full px-3 py-2 rounded border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-slate-900 bg-white";
@@ -16,6 +17,7 @@ const AdminSlides = () => {
   const [form, setForm] = useState(EMPTY);
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState("");
+  const [presetId, setPresetId] = useState("banner");
   const [busy, setBusy] = useState(false);
 
   const load = () => {
@@ -42,7 +44,11 @@ const AdminSlides = () => {
       fd.append("link", form.link);
       fd.append("order", String(form.order || 0));
       fd.append("active", form.active ? "true" : "false");
-      if (image) fd.append("image", image);
+      if (image) {
+        const p = getPreset(presetId);
+        const blob = await cropImageToSize(image, p.w, p.h);
+        fd.append("image", blob, `slide-${p.id}.jpg`);
+      }
       if (editing) { await adminApi.put(`/admin/slides/${editing.id}`, fd); toast.success("Slide updated"); }
       else { await adminApi.post("/admin/slides", fd); toast.success("Slide added"); }
       setView("list"); load();
@@ -99,8 +105,39 @@ const AdminSlides = () => {
       </div>
       <div className="bg-white rounded border border-slate-200 shadow-sm p-5 space-y-4">
         <div>
+          <label className="block text-[13px] font-semibold text-slate-700 mb-1">Image size preset</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="admin-slide-preset-group">
+            {IMAGE_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPresetId(p.id)}
+                className={`text-left px-3 py-2 rounded border text-[13px] transition ${
+                  presetId === p.id
+                    ? "border-blue-600 bg-blue-50 ring-2 ring-blue-500/20"
+                    : "border-slate-300 hover:bg-slate-50"
+                }`}
+                data-testid={`admin-slide-preset-${p.id}`}
+              >
+                <span className="font-semibold text-slate-800 block">{p.label}</span>
+                <span className="text-slate-500 text-xs">{p.w} × {p.h}px</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500 mt-1.5">
+            Uploaded image ko automatically <b>{getPreset(presetId).w} × {getPreset(presetId).h}px</b> ({getPreset(presetId).note}) me center-crop kar diya jayega — pehle se isi size ka image banayein for best result.
+          </p>
+        </div>
+        <div>
           <label className="block text-[13px] font-semibold text-slate-700 mb-1">Image {editing ? "(optional — replace)" : "(required)"}</label>
-          {preview && <img src={preview} alt="" className="w-full h-40 object-cover rounded border border-slate-200 mb-2" />}
+          {preview && (
+            <img
+              src={preview}
+              alt=""
+              style={{ aspectRatio: `${getPreset(presetId).w} / ${getPreset(presetId).h}` }}
+              className="w-full max-h-64 object-cover rounded border border-slate-200 mb-2"
+            />
+          )}
           <input type="file" accept="image/*" onChange={(e) => pickImage(e.target.files?.[0] || null)}
             className="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" data-testid="admin-slide-image" />
         </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "@/lib/api";
+import { enhanceHtml } from "@/lib/htmlContent";
 import SEO from "@/components/SEO";
 import RawHead from "@/components/RawHead";
 import Reviews from "@/components/Reviews";
@@ -68,7 +69,7 @@ const BlogDetail = () => {
 
       <SocialShare title={blog.title} text={blog.excerpt || ""} lang={lang} className="mt-4" />
 
-      <article className="vacancy-article mt-8" dangerouslySetInnerHTML={{ __html: blog.content }} data-testid="blog-detail-content" />
+      <article className="vacancy-article mt-8" dangerouslySetInnerHTML={{ __html: enhanceHtml(blog.content) }} data-testid="blog-detail-content" />
 
       <div className="glass mt-12 p-6 text-center !border-[#25D366]/40">
         <h3 className="font-display text-xl font-bold text-white mb-2">

@@ -999,6 +999,9 @@ body.light-theme .proc-overlay { background: rgba(15,22,19,0.35); }
   transition: color 0.15s;
 }
 .vacancy-article a.ext-link:hover { color: #fbbf24; }
+/* All inline links inside content (editor-created + auto-linked) */
+.vacancy-article a { color: #38bdf8; text-decoration: underline; text-underline-offset: 3px; word-break: break-word; transition: color 0.15s; }
+.vacancy-article a:hover { color: #7dd3fc; }
 .vacancy-article table {
   width: 100%; border-collapse: collapse; margin: 0.8rem 0;
   background: rgba(255,255,255,0.02); border-radius: 8px; overflow: hidden;
@@ -1008,7 +1011,7 @@ body.light-theme .proc-overlay { background: rgba(15,22,19,0.35); }
   padding: 0.5rem 0.75rem; border: 1px solid rgba(255,255,255,0.08); text-align: left;
 }
 .vacancy-article th { background: rgba(5,150,105,0.08); color: #10b981; font-weight: 600; }
-.vacancy-article strong, .vacancy-article b { color: #f1f5f9; }
+.vacancy-article strong, .vacancy-article b { color: #f1f5f9; font-weight: 700; }
 .vacancy-article img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.6rem 0; }
 .vacancy-article hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 1rem 0; }
 
@@ -1017,8 +1020,22 @@ body.light-theme .vacancy-article h1,
 body.light-theme .vacancy-article h2,
 body.light-theme .vacancy-article h3,
 body.light-theme .vacancy-article h4 { color: #0f172a; }
-body.light-theme .vacancy-article strong { color: #0f172a; }
+body.light-theme .vacancy-article strong,
+body.light-theme .vacancy-article b { color: #0f172a; font-weight: 700; }
 body.light-theme .vacancy-article a.ext-link { color: #047857; }
+body.light-theme .vacancy-article a { color: #1d4ed8; }
+body.light-theme .vacancy-article a:hover { color: #1e40af; }
+
+/* Rich text editor (admin) content area */
+.rte-content:empty:before { content: attr(data-placeholder); color: #94a3b8; pointer-events: none; }
+.rte-content h2 { font-size: 1.2rem; font-weight: 700; color: #0f172a; margin: 0.6rem 0 0.3rem; }
+.rte-content h3 { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0.5rem 0 0.3rem; }
+.rte-content p { margin: 0.4rem 0; }
+.rte-content strong, .rte-content b { font-weight: 700; color: #0f172a; }
+.rte-content a { color: #1d4ed8; text-decoration: underline; }
+.rte-content ul { list-style: disc; padding-left: 1.4rem; margin: 0.4rem 0; }
+.rte-content ol { list-style: decimal; padding-left: 1.4rem; margin: 0.4rem 0; }
+.rte-content li { margin: 0.2rem 0; }
 
 /* ─────────── Vacancy detail: stat cards ─────────── */
 .stat-card {
@@ -1150,6 +1167,21 @@ body.light-theme .detail-val { color: #0f172a; }
 .nu-c3:hover { border-color: #f6e0b0; box-shadow: 0 16px 34px -16px rgba(245,158,11,0.42); }
 .nu-c4:hover { border-color: #f6bcbc; box-shadow: 0 16px 34px -16px rgba(239,68,68,0.42); }
 .nu-c5:hover { border-color: #b3ebf3; box-shadow: 0 16px 34px -16px rgba(6,182,212,0.42); }
+
+/* Main vacancy list cards — soft, eye-comfortable multi-colour top accent.
+   No overflow:hidden so the urgent/expired banner above the card stays visible;
+   the gradient fades to transparent at the edges so rounded corners look clean. */
+.vac-accent::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  opacity: 0.5; transition: opacity 0.18s ease; pointer-events: none;
+}
+.vac-accent:hover::before { opacity: 0.9; }
+.vac-c0::before { background: linear-gradient(90deg, transparent, #6ee7b7, transparent); }
+.vac-c1::before { background: linear-gradient(90deg, transparent, #93c5fd, transparent); }
+.vac-c2::before { background: linear-gradient(90deg, transparent, #c4b5fd, transparent); }
+.vac-c3::before { background: linear-gradient(90deg, transparent, #fcd34d, transparent); }
+.vac-c4::before { background: linear-gradient(90deg, transparent, #fca5a5, transparent); }
+.vac-c5::before { background: linear-gradient(90deg, transparent, #67e8f9, transparent); }
 .nu-icon {
   width: 44px; height: 44px;
   border-radius: 12px;

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "@/lib/api";
+import { enhanceHtml } from "@/lib/htmlContent";
 import { useI18n } from "@/context/I18nContext";
 import {
   FaArrowLeft, FaCalendarAlt, FaBuilding, FaGraduationCap, FaClock,
@@ -460,7 +461,7 @@ const VacancyDetail = () => {
           <div className="section-eyebrow mb-3">{lang === "hi" ? "पूरा विवरण" : "Full Details"}</div>
           <div
             className="vacancy-article"
-            dangerouslySetInnerHTML={{ __html: v.content_html }}
+            dangerouslySetInnerHTML={{ __html: enhanceHtml(v.content_html) }}
           />
         </div>
       ) : v.row_text ? (

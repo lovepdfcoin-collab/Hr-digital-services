@@ -4,6 +4,7 @@ import { FaSave, FaTimes, FaPlus, FaTrash, FaFilePdf, FaLink, FaUpload } from "r
 import { adminApi } from "./adminAuth";
 import { computeSeoScore } from "@/lib/utils-seo";
 import { buildWhatsAppSummary } from "@/lib/whatsapp";
+import RichTextEditor from "@/components/RichTextEditor";
 
 const CATEGORIES = [
   { key: "haryana", label: "Haryana" },
@@ -42,6 +43,16 @@ const EMPTY = {
  * Slide-over form used for both Create and Edit. `initial` is null when creating,
  * or the existing vacancy object when editing.
  */
+// Defined at module scope so its identity is stable across re-renders.
+// (Defining it inside the component remounts every child on each keystroke.)
+const FormField = ({ label, children }) => (
+  <label className="block">
+    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+    {children}
+  </label>
+);
+
+
 const VacancyForm = ({ initial, onClose, onSaved }) => {
   const [f, setF] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -138,12 +149,7 @@ const VacancyForm = ({ initial, onClose, onSaved }) => {
     }
   };
 
-  const Field = ({ label, children }) => (
-    <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</span>
-      {children}
-    </label>
-  );
+  const Field = FormField;
 
   const inputCls = "mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-emerald-500 outline-none text-sm text-slate-900 bg-white";
 
@@ -340,9 +346,12 @@ const VacancyForm = ({ initial, onClose, onSaved }) => {
             </div>
           </div>
 
-          <Field label="Description / Notes (plain text or simple HTML)">
-            <textarea value={f.description} onChange={(e) => upd("description", e.target.value)}
-              rows={8} className={inputCls} data-testid="vacancy-form-description" />
+          <Field label="Description / Notes (rich text — bold, headings, links)">
+            <RichTextEditor
+              value={f.description}
+              onChange={(html) => upd("description", html)}
+              placeholder="Type job details… use the toolbar for bold, headings, bullet points and links."
+            />
           </Field>
 
           {/* Rank Math style SEO settings */}

@@ -145,7 +145,16 @@ if (isDevServer) {
 }
 
 const configureDevServer = webpackConfig.devServer;
-webpackConfig.devServer = (devServerConfig) =>
-  makeDevServerV5Compatible(configureDevServer(devServerConfig));
+webpackConfig.devServer = (devServerConfig) => {
+  const cfg = makeDevServerV5Compatible(configureDevServer(devServerConfig));
+  // Keep compile-error overlay, but don't let uncaught runtime errors from
+  // third-party scripts (Webpushr/analytics/platform) block the app with a
+  // full-screen overlay. This is dev-only; production builds have no overlay.
+  cfg.client = {
+    ...(cfg.client || {}),
+    overlay: { errors: true, warnings: false, runtimeErrors: false },
+  };
+  return cfg;
+};
 
 module.exports = webpackConfig;

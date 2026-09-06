@@ -164,7 +164,10 @@ const Vacancies = () => {
   const [latestJobs, setLatestJobs] = useState([]);
 
   const scrollToList = () => {
-    document.getElementById("all-vacancies")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const el = document.getElementById("all-vacancies");
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.pageYOffset - 90; // clear the sticky header
+    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
   };
 
   const toggleBookmark = (id) => {
@@ -218,9 +221,9 @@ const Vacancies = () => {
     return () => clearTimeout(t);
   }, [q]);
 
-  // Latest 9 vacancies for the "New Updates" strip (always unfiltered)
+  // Latest vacancies for the "New Updates" strip (always unfiltered)
   useEffect(() => {
-    api.get("/vacancies", { params: { page: 1, per_page: 9 } })
+    api.get("/vacancies", { params: { page: 1, per_page: 12 } })
       .then((r) => setLatestJobs(Array.isArray(r.data) ? r.data : r.data?.items || []))
       .catch(() => {});
   }, []);
@@ -282,7 +285,7 @@ const Vacancies = () => {
           </p>
         </div>
         {user && user.role === "admin" && (
-          <button onClick={refresh} disabled={refreshing} className="btn-mint" data-testid="vacancies-refresh-btn">
+          <button onClick={refresh} disabled={refreshing} className="btn-mint !hidden md:!inline-flex" data-testid="vacancies-refresh-btn">
             <FaSync className={refreshing ? "animate-spin" : ""} /> {lang === "hi" ? "अभी अपडेट करें" : "Refresh Now"}
           </button>
         )}
@@ -313,13 +316,13 @@ const Vacancies = () => {
         <div className="px-4 sm:px-5 py-4">
           {latestJobs.length === 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {[...Array(9)].map((_, i) => <div key={i} className="h-28 rounded-2xl bg-white/5 animate-pulse" />)}
+              {[...Array(12)].map((_, i) => <div key={i} className="h-28 rounded-2xl bg-white/5 animate-pulse" />)}
             </div>
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {[...latestJobs]
                 .sort((a, b) => (isHaryana(b) - isHaryana(a)) || (numPosts(b) - numPosts(a)))
-                .slice(0, 9).map((v, i) => {
+                .slice(0, 12).map((v, i) => {
                 const posts = v.structured?.total_posts_num || v.structured?.total_posts ||
                   (String(v.post_name || v.title || "").match(/(\d[\d,]*)\s*(?:posts?|vacanc|seat)/i)?.[1]);
                 return (
@@ -469,7 +472,7 @@ const Vacancies = () => {
             const expired = (v.is_expired === true) || (days !== null && days < 0);
             return (
               <Link key={v.id || v.url + i} to={`/vacancies/${v.id}`}
-                className={`glass p-4 hover:border-emerald-500/40 transition group block relative ${expired ? "opacity-60" : ""} ${urgent ? "ring-2 ring-red-500/40" : ""}`}
+                className={`glass p-4 hover:border-emerald-500/40 transition group block relative vac-accent vac-c${i % 6} ${expired ? "opacity-60" : ""} ${urgent ? "ring-2 ring-red-500/40" : ""}`}
                 data-testid={`vacancy-${i}`}>
                 {/* URGENT / EXPIRED banner — bright, top strip so it's the first thing users notice */}
                 {expired && (
@@ -571,7 +574,7 @@ const Vacancies = () => {
       {/* Pagination — 20 vacancies per page */}
       {pages > 1 && !loading && (
         <div className="mt-8 flex items-center justify-center gap-2 flex-wrap" data-testid="jobs-pagination">
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="chip disabled:opacity-40" data-testid="jobs-pagination-previous-button">
+          <button onClick={() => { setPage((p) => Math.max(1, p - 1)); scrollToList(); }} disabled={page <= 1} className="chip disabled:opacity-40" data-testid="jobs-pagination-previous-button">
             {lang === "hi" ? "← पिछला" : "← Prev"}
           </button>
           {Array.from({ length: Math.min(pages, 7) }).map((_, i) => {
@@ -579,10 +582,10 @@ const Vacancies = () => {
             const p = start + i;
             if (p > pages) return null;
             return (
-              <button key={p} onClick={() => setPage(p)} className={`chip ${p === page ? "!bg-emerald-500 !text-white !border-emerald-400" : ""}`} data-testid={`jobs-pagination-page-${p}`}>{p}</button>
+              <button key={p} onClick={() => { setPage(p); scrollToList(); }} className={`chip ${p === page ? "!bg-emerald-500 !text-white !border-emerald-400" : ""}`} data-testid={`jobs-pagination-page-${p}`}>{p}</button>
             );
           })}
-          <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} className="chip disabled:opacity-40" data-testid="jobs-pagination-next-button">
+          <button onClick={() => { setPage((p) => Math.min(pages, p + 1)); scrollToList(); }} disabled={page >= pages} className="chip disabled:opacity-40" data-testid="jobs-pagination-next-button">
             {lang === "hi" ? "अगला →" : "Next →"}
           </button>
           <span className="text-xs text-slate-500 ml-2">{lang === "hi" ? `पेज ${page}/${pages} · कुल ${total}` : `Page ${page}/${pages} · ${total} total`}</span>
