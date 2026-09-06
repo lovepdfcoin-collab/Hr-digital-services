@@ -7,6 +7,7 @@ import {
 } from "react-icons/fa";
 import { adminApi } from "./adminAuth";
 import { BACKEND_URL as BACKEND } from "@/lib/api";
+import { IMAGE_PRESETS, getPreset, cropImageToSize } from "@/lib/imagePresets";
 
 const inputCls =
   "w-full px-3 py-2 rounded border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm text-slate-900 bg-white";
@@ -24,6 +25,7 @@ const AdminBlogs = () => {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [image, setImage] = useState(null);
+  const [imgPreset, setImgPreset] = useState("banner");
   const [imgPreview, setImgPreview] = useState("");
   const [contentText, setContentText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -133,7 +135,11 @@ const AdminBlogs = () => {
       fd.append("seo_title", form.seo_title);
       fd.append("seo_description", form.seo_description);
       fd.append("custom_head", form.custom_head || "");
-      if (image) fd.append("image", image);
+      if (image) {
+        const p = getPreset(imgPreset);
+        const blob = await cropImageToSize(image, p.w, p.h);
+        fd.append("image", blob, `cover-${p.id}.jpg`);
+      }
       if (editing) {
         fd.append("slug", editing.slug || "");
         await adminApi.put(`/admin/blogs/${editing.id}`, fd);
@@ -413,11 +419,44 @@ const AdminBlogs = () => {
           <div className="bg-white rounded border border-slate-200 shadow-sm" data-testid="featured-image-box">
             <div className="px-4 py-2.5 border-b border-slate-200 font-semibold text-slate-800 text-sm flex items-center gap-2"><FaImage className="text-emerald-600" /> Featured image</div>
             <div className="p-4">
+              <div className="grid grid-cols-2 gap-2 mb-3" data-testid="admin-blog-preset-group">
+                {IMAGE_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setImgPreset(p.id)}
+                    className={`text-left px-2.5 py-1.5 rounded border text-[12px] transition ${
+                      imgPreset === p.id
+                        ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-500/20"
+                        : "border-slate-300 hover:bg-slate-50"
+                    }`}
+                    data-testid={`admin-blog-preset-${p.id}`}
+                  >
+                    <span className="font-semibold text-slate-800 block">{p.label}</span>
+                    <span className="text-slate-500">{p.w} × {p.h}px</span>
+                  </button>
+                ))}
+              </div>
               {imgPreview ? (
-                <div className="mb-3"><img src={imgPreview} alt="" className="w-full h-36 object-cover rounded border border-slate-200" /></div>
+                <div className="mb-3">
+                  <img
+                    src={imgPreview}
+                    alt=""
+                    style={{ aspectRatio: `${getPreset(imgPreset).w} / ${getPreset(imgPreset).h}` }}
+                    className="w-full max-h-48 object-cover rounded border border-slate-200"
+                  />
+                </div>
               ) : (
-                <div className="mb-3 h-36 rounded border border-dashed border-slate-300 grid place-items-center text-slate-300"><FaImage className="text-3xl" /></div>
+                <div
+                  className="mb-3 rounded border border-dashed border-slate-300 grid place-items-center text-slate-300"
+                  style={{ aspectRatio: `${getPreset(imgPreset).w} / ${getPreset(imgPreset).h}`, maxHeight: "12rem" }}
+                >
+                  <FaImage className="text-3xl" />
+                </div>
               )}
+              <p className="text-[11px] text-slate-500 mb-2">
+                Image auto-crop hokar <b>{getPreset(imgPreset).w} × {getPreset(imgPreset).h}px</b> ({getPreset(imgPreset).note}) me save hoga.
+              </p>
               <input type="file" accept="image/*" onChange={(e) => pickImage(e.target.files?.[0] || null)}
                 className="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                 data-testid="admin-blog-image" />

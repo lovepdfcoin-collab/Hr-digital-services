@@ -1001,6 +1001,7 @@ body.light-theme .proc-overlay { background: rgba(15,22,19,0.35); }
 .vacancy-article a.ext-link:hover { color: #fbbf24; }
 /* All inline links inside content (editor-created + auto-linked) */
 .vacancy-article a { color: #38bdf8; text-decoration: underline; text-underline-offset: 3px; word-break: break-word; transition: color 0.15s; }
+.vacancy-article code { background: rgba(148,163,184,0.18); padding: 0.05em 0.4em; border-radius: 4px; font-size: 0.9em; }
 .vacancy-article a:hover { color: #7dd3fc; }
 .vacancy-article table {
   width: 100%; border-collapse: collapse; margin: 0.8rem 0;
