@@ -78,6 +78,20 @@ export function enhanceHtml(html) {
     // 0) Markdown → HTML (bold / headings / italic / code / links).
     applyMarkdown(root, doc);
 
+    // 0b) Strip baked-in inline text colours/backgrounds so the site theme
+    // controls contrast. Scraped/pasted content often carries dark inline
+    // colours that become invisible in dark mode.
+    root.querySelectorAll("[style]").forEach((el) => {
+      el.style.removeProperty("color");
+      el.style.removeProperty("background");
+      el.style.removeProperty("background-color");
+      if (!el.getAttribute("style") || !el.getAttribute("style").trim()) {
+        el.removeAttribute("style");
+      }
+    });
+    root.querySelectorAll("font[color]").forEach((el) => el.removeAttribute("color"));
+    root.querySelectorAll("font[bgcolor]").forEach((el) => el.removeAttribute("bgcolor"));
+
     const urlRe = /((?:https?:\/\/|www\.)[^\s<]+[^\s<.,;:)"'!?\]])/gi;
 
     // 1) Linkify bare URLs inside plain text nodes only.

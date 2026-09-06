@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { FaPlus, FaEdit, FaTrash, FaExternalLinkAlt, FaBriefcase, FaWhatsapp, FaRandom } from "react-icons/fa";
+import { FaPlus, FaEdit, FaTrash, FaExternalLinkAlt, FaBriefcase, FaWhatsapp, FaRandom, FaSync } from "react-icons/fa";
 import { adminApi } from "./adminAuth";
 import VacancyForm from "./VacancyForm";
 
@@ -32,6 +32,20 @@ const AdminVacancies = () => {
       toast.error(err?.response?.data?.detail || "Shuffle failed");
     } finally {
       setShuffling(false);
+    }
+  };
+
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshFeed = async () => {
+    setRefreshing(true);
+    try {
+      const { data } = await adminApi.post("/admin/vacancies/refresh");
+      toast.success(`Feed refreshed: +${data.new_added} new · ${data.total} total`);
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Refresh failed");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -68,6 +82,15 @@ const AdminVacancies = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={refreshFeed}
+            disabled={refreshing}
+            className="px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white text-sm font-semibold inline-flex items-center gap-2 shadow"
+            data-testid="admin-refresh-feed-btn"
+            title="Scrape latest jobs from sources into the public feed"
+          >
+            <FaSync className={refreshing ? "animate-spin" : ""} /> Refresh Feed
+          </button>
           <button
             onClick={shuffleSeo}
             disabled={shuffling}

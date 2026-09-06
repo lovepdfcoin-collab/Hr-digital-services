@@ -284,11 +284,6 @@ const Vacancies = () => {
             )}
           </p>
         </div>
-        {user && user.role === "admin" && (
-          <button onClick={refresh} disabled={refreshing} className="btn-mint !hidden md:!inline-flex" data-testid="vacancies-refresh-btn">
-            <FaSync className={refreshing ? "animate-spin" : ""} /> {lang === "hi" ? "अभी अपडेट करें" : "Refresh Now"}
-          </button>
-        )}
       </div>
 
       {/* Job Alert Subscription (Free) */}
