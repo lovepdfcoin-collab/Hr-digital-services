@@ -20,6 +20,38 @@ from bs4 import BeautifulSoup
 
 log = logging.getLogger("scraper")
 
+# ─────────── Brand replacement ───────────
+# Any user-facing text scraped from the source may mention "FreeJobAlert"
+# (and its spelling variants). We swap every such mention for our own brand so
+# no third-party branding ever leaks onto the site.
+SITE_BRAND = "HR Digital Services"
+_BRAND_RE = re.compile(r"free\s*job\s*alert(?:\s*\.\s*com)?", re.I)
+
+
+def apply_brand(text):
+    """Replace 'FreeJobAlert' / 'Free Job Alert' / 'freejobalert.com' mentions in
+    plain text with our own brand name. Safe on None."""
+    if not text:
+        return text
+    return _BRAND_RE.sub(SITE_BRAND, text)
+
+
+def brand_html(html: str) -> str:
+    """Replace brand mentions inside the *text nodes* of an HTML string without
+    corrupting element attributes / URLs (e.g. an allowed .pdf href)."""
+    if not html:
+        return html
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return apply_brand(html)
+    from bs4 import NavigableString
+    for node in soup.find_all(string=True):
+        if _BRAND_RE.search(node):
+            node.replace_with(NavigableString(_BRAND_RE.sub(SITE_BRAND, str(node))))
+    return str(soup)
+
+
 SOURCES = [
     ("latest", "https://www.freejobalert.com/latest-notifications/"),
     ("sarkari", "https://www.freejobalert.com/sarkari-naukri/"),
@@ -448,12 +480,21 @@ async def refresh_vacancies_into_db(db) -> int:
     merged = 0
     for v in vacs:
         v["dedupe_key"] = _dedupe_key(v.get("title", ""))
+        # Strip source branding from user-facing text before storing
+        for f in ("title", "post_name", "organization", "row_text"):
+            if v.get(f):
+                v[f] = apply_brand(v[f])
         # Haryana-state jobs belong in the "haryana" category, not "other"
         if v.get("state") == "haryana" and v.get("category") == "other":
             v["category"] = "haryana"
         try:
-            by_url = await db.vacancies.find_one({"url": v["url"]}, {"_id": 1})
+            by_url = await db.vacancies.find_one({"url": v["url"]}, {"_id": 1, "source": 1})
             if by_url:
+                # Never override a manually-edited / locked post. Once an admin
+                # edits a post it becomes "manual" and is owned by the admin —
+                # the auto-refresh must leave it untouched (only manual delete removes it).
+                if by_url.get("source") == "manual":
+                    continue
                 await db.vacancies.update_one({"_id": by_url["_id"]}, {"$set": v})
                 continue
             if v["dedupe_key"]:
@@ -761,11 +802,11 @@ async def fetch_article_detail(url: str) -> Dict | None:
             structured = _extract_structured_facts(article)
             content_html = _clean_article_html(article)
             return {
-                "heading": heading[:250],
-                "description": description,
+                "heading": apply_brand(heading[:250]),
+                "description": apply_brand(description),
                 "important_links": important_links,
                 "structured": structured,
-                "content_html": content_html[:60000],
+                "content_html": brand_html(content_html[:60000]),
                 "detail_fetched_at": datetime.now(timezone.utc),
             }
     except Exception as e:

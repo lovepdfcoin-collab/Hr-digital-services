@@ -7,6 +7,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth in-page scrolling for Table-of-Contents anchor jumps */
+html { scroll-behavior: smooth; }
+
 :root {
   --bg: #0a0f0d;
   --bg-2: #0f1613;
@@ -1015,6 +1018,41 @@ body.light-theme .proc-overlay { background: rgba(15,22,19,0.35); }
 .vacancy-article strong, .vacancy-article b { color: #f1f5f9; font-weight: 700; }
 .vacancy-article img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.6rem 0; }
 .vacancy-article hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 1rem 0; }
+
+/* Give heading sections room under the sticky header when jumped to via TOC */
+.vacancy-article h1[id], .vacancy-article h2[id], .vacancy-article h3[id],
+.vacancy-article h4[id], .vacancy-article h5[id], .vacancy-article h6[id],
+.vacancy-article [id] { scroll-margin-top: 120px; }
+
+/* ── Working Table of Contents (built from scraped TOC) ── */
+.vacancy-article .post-toc {
+  margin: 1rem 0 1.4rem; padding: 0.9rem 1.1rem;
+  background: rgba(16,185,129,0.06);
+  border: 1px solid rgba(16,185,129,0.22);
+  border-radius: 12px;
+}
+.vacancy-article .post-toc-title {
+  font-weight: 800; color: #10b981; font-size: 0.95rem;
+  margin-bottom: 0.5rem; letter-spacing: 0.02em;
+}
+.vacancy-article .post-toc-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem;
+}
+.vacancy-article .post-toc-list li { margin: 0; }
+.vacancy-article a.post-toc-link {
+  display: inline-block; text-decoration: none;
+  color: #e2e8f0; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 0.3rem 0.7rem; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 600; transition: all 0.15s;
+}
+.vacancy-article a.post-toc-link:hover {
+  color: #052e1a; background: #10b981; border-color: #10b981;
+}
+body.light-theme .vacancy-article a.post-toc-link { color: #0f766e; background: #ffffff; border-color: rgba(16,185,129,0.35); }
+body.light-theme .vacancy-article a.post-toc-link:hover { color: #ffffff; background: #10b981; }
+
 
 body.light-theme .vacancy-article { color: #334155; }
 body.light-theme .vacancy-article h1,

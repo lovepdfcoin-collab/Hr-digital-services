@@ -104,3 +104,16 @@ Files: `frontend/src/themes.css`, `frontend/src/index.css`, `frontend/src/compon
 - **Email delivery**: emails.py now sends via **Resend** when RESEND_API_KEY set (backend/.env; sender onboarding@resend.dev, free tier → only verified recipient until domain verified). Verified iteration_5.
 - **Admin → Site Theme & Links** (`/admin/site`, pages/admin/AdminSite.jsx): theme cards, primary colour, lock toggle, footer social links (facebook/twitter/instagram/whatsapp/youtube). Backend `/site-settings` adds theme_locked, theme_updated_at, social_*; PUT validates theme whitelist + #RRGGBB. ThemeContext adopts admin theme live for everyone when stamp changes / locked (switcher hidden when locked). Footer icons always visible; unset → link to `/`. Verified iteration_6.
 - Backlog: decide Harmony live; Webpushr site key; Resend domain verification (SENDER_EMAIL).
+
+## Update (2026-06 session, fork) — 9 features copied from GitHub repo `suresh-hr`
+User asked to copy ONLY these 9 features' code from their repo (sureshkhetlan256-creator/suresh-hr) into current app, leaving everything else unchanged. Done by diffing repo vs /app and copying 13 changed files. Tested (iteration_7.json: backend 6/6, frontend 9/9, 0 issues).
+1. **Branding auto-replace** — scrapers.py `apply_brand()`/`brand_html()` swap "FreeJobAlert"→"HR Digital Services" in text nodes; PDF/href links preserved. One-time startup backfill (`settings._id=brand_applied_v1`).
+2. **Manual lock** — refresh_vacancies_into_db skips `source=='manual'` posts; admin edit already promotes to manual; only manual delete removes.
+3. **Search without filter** — GET /api/vacancies: when `q` present, search spans ALL categories (incl admit_card/result); without q, those stay excluded from default view (server.py ~L694).
+4. **Sticky navbar** — Header.jsx wraps in `<header className="sticky top-0 z-50" data-testid="site-header">`.
+5. **Image aspect (no crop)** — HeroCarousel/BlogDetail/Blogs card/AdminSlides use object-contain; new `fitImageToSize()` in imagePresets.js used by AdminBlogs/AdminSlides uploads.
+6. **RTE pre-fill on edit** — RichTextEditor.jsx syncs external `value` when editor unfocused (fixes blank description on edit).
+7. **Working TOC** — htmlContent.js `buildTableOfContents()` builds nav.post-toc clickable smooth-scroll links, removes duplicate raw TOC; CSS in index.css.
+8. **Admin Views column** — AdminVacancies.jsx shows Views count (data-testid admin-vac-views-<id>).
+9. **Blog center image** — backend blog create/update accept `center_image`/`remove_center_image` → `center_image_url`; AdminBlogs.jsx optional Center image upload; BlogDetail renders it (data-testid blog-center-image).
+Files copied: backend/scrapers.py, backend/server.py, frontend/src/{components/Header.jsx, components/HeroCarousel.jsx, components/RichTextEditor.jsx, index.css, lib/htmlContent.js, lib/imagePresets.js, pages/BlogDetail.jsx, pages/Blogs.jsx, pages/admin/AdminBlogs.jsx, pages/admin/AdminSlides.jsx, pages/admin/AdminVacancies.jsx}.

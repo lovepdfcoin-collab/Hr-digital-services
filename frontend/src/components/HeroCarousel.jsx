@@ -27,7 +27,9 @@ const HeroCarousel = () => {
 
   const Inner = (
     <>
-      <img src={`${BACKEND_URL}${s.image_url}`} alt={s.title || "slide"} className="absolute inset-0 w-full h-full object-cover" />
+      {/* Blurred backdrop fills the frame; the real image shows fully (no crop). */}
+      <img src={`${BACKEND_URL}${s.image_url}`} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-40" />
+      <img src={`${BACKEND_URL}${s.image_url}`} alt={s.title || "slide"} className="absolute inset-0 w-full h-full object-contain" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
       {(s.title || s.subtitle) && (
         <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7">

@@ -28,6 +28,172 @@ function hasInlineMd(text) {
   return /\*\*[^*]+\*\*|__[^_]+__|\*[^*\s][^*]*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\//.test(text);
 }
 
+const _slugify = (s) =>
+  (s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0900-\u097F]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "sec";
+
+const _tocNorm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+// Turn a scraped "Table of Contents" block into WORKING in-page links that
+// smooth-scroll to the matching section heading. Runs for vacancy + blog HTML.
+function buildTableOfContents(root, doc) {
+  // 1) Give every section heading a stable id (used as scroll target).
+  const headings = Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+  const used = new Set();
+  headings.forEach((h) => {
+    let id = h.id || _slugify(h.textContent);
+    let base = id, n = 2;
+    while (used.has(id) || (doc.getElementById && doc.getElementById(id) && doc.getElementById(id) !== h)) {
+      id = `${base}-${n++}`;
+    }
+    h.id = id;
+    used.add(id);
+  });
+
+  // Resolve a scroll target for a TOC label — first try headings, then any
+  // short bold/paragraph label that matches.
+  const findTarget = (labelNorm) => {
+    if (!labelNorm) return null;
+    let hit = headings.find((h) => {
+      const hn = _tocNorm(h.textContent);
+      return hn && (hn.includes(labelNorm) || labelNorm.includes(hn));
+    });
+    if (hit) return hit;
+    const els = Array.from(root.querySelectorAll("strong, b, p, td, li"));
+    hit = els.find((el) => {
+      const t = (el.textContent || "").trim();
+      if (t.length > 60) return false;
+      const hn = _tocNorm(t);
+      return hn && (hn === labelNorm || hn.startsWith(labelNorm) || labelNorm.startsWith(hn));
+    });
+    if (hit) {
+      if (!hit.id) {
+        let id = _slugify(hit.textContent), base = id, n = 2;
+        while (used.has(id)) id = `${base}-${n++}`;
+        hit.id = id; used.add(id);
+      }
+      return hit;
+    }
+    return null;
+  };
+
+  // 2) Collect ALL "Table of Contents" source blocks in the content — scraped
+  // articles sometimes carry more than one (e.g. an anchor list + a plain
+  // "Table Of Contents" heading followed by a space-separated label line).
+  const TOC_HINT = /overview|important dates|eligibility|how to apply|selection|age limit|vacanc/i;
+  const SECTION_WORDS = ["overview", "important date", "vacanc", "eligibil", "salary", "fee", "age limit", "selection", "how to apply", "instruction", "link"];
+  const looksLikeTocList = (el) => {
+    if (!el) return false;
+    const low = (el.textContent || "").toLowerCase();
+    if (low.length > 900) return false;
+    return SECTION_WORDS.filter((w) => low.includes(w)).length >= 4;
+  };
+
+  const sources = [];
+  for (const el of Array.from(root.querySelectorAll("p, div, ul, ol, nav, section, aside, h1, h2, h3, h4, h5, h6, details, summary"))) {
+    if (!el.isConnected) continue;
+    const t = (el.textContent || "").trim();
+    const low = t.toLowerCase();
+    const pipes = (t.match(/\|/g) || []).length;
+    const startsToc = /^[\s▼▲►▸▾▿◂◃‣·•\-]*table\s+of\s+contents/i.test(low) && low.length < 900;
+    const isPipeList = pipes >= 3 && TOC_HINT.test(low) && low.length < 900;
+    if (!startsToc && !isPipeList) continue;
+    // Skip if an already-collected source contains this one (avoid nesting dupes)
+    if (sources.some((s) => s.contains(el) || el.contains(s))) {
+      // keep the outermost: if the new el contains an existing source, replace it
+      for (let i = sources.length - 1; i >= 0; i--) {
+        if (el.contains(sources[i]) && el !== sources[i]) sources.splice(i, 1);
+      }
+      if (sources.some((s) => s.contains(el))) continue;
+    }
+    sources.push(el);
+  }
+  if (sources.length === 0) return;
+
+  // 3) Parse the best set of labels from the sources.
+  const parseLabels = (text) => {
+    const raw = (text || "").replace(/^[\s▼▲►▸▾▿◂◃‣·•\-]*table\s+of\s+contents\s*:?/i, "").trim();
+    if (!raw) return [];
+    let parts;
+    if (/\|/.test(raw)) parts = raw.split(/\s*\|\s*/);
+    else if (/\n/.test(raw)) parts = raw.split(/\n+/);
+    else return []; // single space-separated blob — can't split multiword labels
+    return parts.map((s) => s.trim()).filter((s) => s && s.length <= 40);
+  };
+
+  let labels = [];
+  const listSiblings = []; // heading-form sources' following label lines to remove
+  for (const src of sources) {
+    const own = parseLabels(src.textContent);
+    if (own.length > labels.length) labels = own;
+    // A "Table Of Contents" heading often has the labels in the next sibling.
+    if (/^[\s▼▲►▸▾▿◂◃‣·•\-]*table\s+of\s+contents/i.test((src.textContent || "").trim().toLowerCase())) {
+      const next = src.nextElementSibling;
+      if (next && looksLikeTocList(next)) {
+        listSiblings.push(next);
+        const sib = parseLabels(next.textContent);
+        if (sib.length > labels.length) labels = sib;
+      }
+    }
+  }
+
+  // Fallback: derive labels from the actual section headings in the content.
+  if (labels.length < 2) {
+    labels = headings
+      .filter((h) => {
+        const low = (h.textContent || "").toLowerCase();
+        return SECTION_WORDS.some((w) => low.includes(w));
+      })
+      .map((h) => (h.textContent || "").trim())
+      .filter((t) => t && t.length <= 40);
+  }
+  if (labels.length < 2) return;
+
+  // 4) Build a styled nav of working links (plain text when a section can't be
+  // located, so nothing ever looks broken).
+  const nav = doc.createElement("nav");
+  nav.className = "post-toc";
+  const title = doc.createElement("div");
+  title.className = "post-toc-title";
+  title.textContent = "Table of Contents";
+  nav.appendChild(title);
+  const ul = doc.createElement("ul");
+  ul.className = "post-toc-list";
+  let linkCount = 0;
+  const seenLabel = new Set();
+  labels.forEach((label) => {
+    const key = _tocNorm(label);
+    if (!key || seenLabel.has(key)) return;
+    seenLabel.add(key);
+    const li = doc.createElement("li");
+    const target = findTarget(key);
+    if (target) {
+      const a = doc.createElement("a");
+      a.setAttribute("href", `#${target.id}`);
+      a.className = "post-toc-link";
+      a.textContent = label;
+      li.appendChild(a);
+      linkCount++;
+    } else {
+      li.textContent = label;
+    }
+    ul.appendChild(li);
+  });
+  nav.appendChild(ul);
+  if (linkCount === 0) return;
+
+  // 5) Insert the working nav in place of the first source, then remove every
+  // other original TOC block (and heading-follow label lines) so no duplicate
+  // raw "Table Of Contents" text remains.
+  const first = sources[0];
+  first.replaceWith(nav);
+  sources.slice(1).forEach((s) => { if (s.isConnected) s.remove(); });
+  listSiblings.forEach((s) => { if (s.isConnected && !s.closest(".post-toc")) s.remove(); });
+}
+
 // Convert Markdown embedded in the parsed HTML DOM (block headings + inline).
 function applyMarkdown(root, doc) {
   // Block-level headings: a P/DIV line OR a bare text-node line whose text
@@ -78,6 +244,9 @@ export function enhanceHtml(html) {
     // 0) Markdown → HTML (bold / headings / italic / code / links).
     applyMarkdown(root, doc);
 
+    // 0a) Turn a scraped "Table of Contents" into working in-page links.
+    buildTableOfContents(root, doc);
+
     // 0b) Strip baked-in inline text colours/backgrounds so the site theme
     // controls contrast. Scraped/pasted content often carries dark inline
     // colours that become invisible in dark mode.
@@ -124,10 +293,12 @@ export function enhanceHtml(html) {
       node.parentNode.replaceChild(frag, node);
     });
 
-    // 2) Make every anchor open safely in a new tab.
+    // 2) Make external anchors open safely in a new tab — but leave in-page
+    // (#id) TOC links alone so they smooth-scroll within the post.
     root.querySelectorAll("a").forEach((a) => {
       const href = a.getAttribute("href") || "";
-      if (href && !/^https?:\/\//i.test(href) && !href.startsWith("/") && !href.startsWith("#")) {
+      if (href.startsWith("#")) return; // in-page TOC link — keep default behaviour
+      if (href && !/^https?:\/\//i.test(href) && !href.startsWith("/")) {
         a.setAttribute("href", `https://${href}`);
       }
       a.setAttribute("target", "_blank");

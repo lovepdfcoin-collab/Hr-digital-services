@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { FaPlus, FaEdit, FaTrash, FaExternalLinkAlt, FaBriefcase, FaWhatsapp, FaRandom, FaSync } from "react-icons/fa";
+import { FaPlus, FaEdit, FaTrash, FaExternalLinkAlt, FaBriefcase, FaWhatsapp, FaRandom, FaSync, FaEye } from "react-icons/fa";
 import { adminApi } from "./adminAuth";
 import VacancyForm from "./VacancyForm";
 
@@ -138,6 +138,7 @@ const AdminVacancies = () => {
                 <th className="text-left px-4 py-3 hidden lg:table-cell">Category</th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell">Mode</th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell">Last Date</th>
+                <th className="text-left px-4 py-3 hidden lg:table-cell">Views</th>
                 <th className="text-right px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -160,6 +161,9 @@ const AdminVacancies = () => {
                     ) : <span className="text-slate-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{v.last_date_text || "—"}</td>
+                  <td className="px-4 py-3 text-slate-600 hidden lg:table-cell" data-testid={`admin-vac-views-${v.id}`}>
+                    <span className="inline-flex items-center gap-1"><FaEye className="text-slate-400 text-[11px]" /> {(v.views || 0).toLocaleString()}</span>
+                  </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button
                       onClick={() => copyWhatsApp(v)}

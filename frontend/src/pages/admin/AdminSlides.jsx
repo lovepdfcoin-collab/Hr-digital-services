@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { FaPlus, FaEdit, FaTrash, FaSave, FaImage, FaArrowLeft } from "react-icons/fa";
 import { adminApi } from "./adminAuth";
 import { BACKEND_URL } from "@/lib/api";
-import { IMAGE_PRESETS, getPreset, cropImageToSize } from "@/lib/imagePresets";
+import { IMAGE_PRESETS, getPreset, fitImageToSize } from "@/lib/imagePresets";
 
 const inputCls =
   "w-full px-3 py-2 rounded border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-slate-900 bg-white";
@@ -46,7 +46,7 @@ const AdminSlides = () => {
       fd.append("active", form.active ? "true" : "false");
       if (image) {
         const p = getPreset(presetId);
-        const blob = await cropImageToSize(image, p.w, p.h);
+        const blob = await fitImageToSize(image, p.w, p.h);
         fd.append("image", blob, `slide-${p.id}.jpg`);
       }
       if (editing) { await adminApi.put(`/admin/slides/${editing.id}`, fd); toast.success("Slide updated"); }
@@ -80,7 +80,7 @@ const AdminSlides = () => {
           ) : (
             items.map((s) => (
               <div key={s.id} className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-blue-50/40" data-testid={`admin-slide-row-${s.id}`}>
-                {s.image_url ? <img src={`${BACKEND_URL}${s.image_url}`} alt="" className="w-24 h-14 rounded object-cover shrink-0" /> : <div className="w-24 h-14 rounded bg-slate-100 grid place-items-center text-slate-300"><FaImage /></div>}
+                {s.image_url ? <img src={`${BACKEND_URL}${s.image_url}`} alt="" className="w-24 h-14 rounded object-contain bg-slate-100 shrink-0" /> : <div className="w-24 h-14 rounded bg-slate-100 grid place-items-center text-slate-300"><FaImage /></div>}
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-slate-800 truncate">{s.title || <span className="text-slate-400">(no title)</span>}</p>
                   <p className="text-xs text-slate-400 truncate">{s.subtitle}</p>
@@ -135,7 +135,7 @@ const AdminSlides = () => {
               src={preview}
               alt=""
               style={{ aspectRatio: `${getPreset(presetId).w} / ${getPreset(presetId).h}` }}
-              className="w-full max-h-64 object-cover rounded border border-slate-200 mb-2"
+              className="w-full max-h-64 object-contain bg-slate-100 rounded border border-slate-200 mb-2"
             />
           )}
           <input type="file" accept="image/*" onChange={(e) => pickImage(e.target.files?.[0] || null)}

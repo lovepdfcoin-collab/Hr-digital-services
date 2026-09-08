@@ -7,7 +7,7 @@ import {
 } from "react-icons/fa";
 import { adminApi } from "./adminAuth";
 import { BACKEND_URL as BACKEND } from "@/lib/api";
-import { IMAGE_PRESETS, getPreset, cropImageToSize } from "@/lib/imagePresets";
+import { IMAGE_PRESETS, getPreset, fitImageToSize } from "@/lib/imagePresets";
 
 const inputCls =
   "w-full px-3 py-2 rounded border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-sm text-slate-900 bg-white";
@@ -27,6 +27,9 @@ const AdminBlogs = () => {
   const [image, setImage] = useState(null);
   const [imgPreset, setImgPreset] = useState("banner");
   const [imgPreview, setImgPreview] = useState("");
+  const [centerImage, setCenterImage] = useState(null);
+  const [centerPreview, setCenterPreview] = useState("");
+  const [removeCenter, setRemoveCenter] = useState(false);
   const [contentText, setContentText] = useState("");
   const [busy, setBusy] = useState(false);
   const [taxonomy, setTaxonomy] = useState({ categories: [], tags: [] });
@@ -50,10 +53,11 @@ const AdminBlogs = () => {
       editorRef.current.innerHTML = form.content || "";
       setContentText(editorRef.current.innerText || "");
     }
-  }, [view]); // eslint-disable-line
+  }, [view, editing]); // eslint-disable-line
 
   const openCreate = () => {
     setEditing(null); setForm(EMPTY); setImage(null); setImgPreview(""); setContentText(""); setSeoTab("general");
+    setCenterImage(null); setCenterPreview(""); setRemoveCenter(false);
     setView("edit");
   };
   const openEdit = (b) => {
@@ -64,6 +68,7 @@ const AdminBlogs = () => {
       seo_title: b.seo_title || "", seo_description: b.seo_description || "", custom_head: b.custom_head || "",
     });
     setImage(null); setImgPreview(b.image_url ? `${BACKEND}${b.image_url}` : ""); setSeoTab("general");
+    setCenterImage(null); setCenterPreview(b.center_image_url ? `${BACKEND}${b.center_image_url}` : ""); setRemoveCenter(false);
     setView("edit");
   };
 
@@ -72,6 +77,8 @@ const AdminBlogs = () => {
   const onEditorInput = () => setContentText(editorRef.current?.innerText || "");
 
   const pickImage = (f) => { setImage(f); setImgPreview(f ? URL.createObjectURL(f) : ""); };
+  const pickCenter = (f) => { setCenterImage(f); setCenterPreview(f ? URL.createObjectURL(f) : ""); if (f) setRemoveCenter(false); };
+  const clearCenter = () => { setCenterImage(null); setCenterPreview(""); setRemoveCenter(true); };
 
   const toggleCat = (c) =>
     setForm((f) => ({ ...f, categories: f.categories.includes(c) ? f.categories.filter((x) => x !== c) : [...f.categories, c] }));
@@ -137,8 +144,16 @@ const AdminBlogs = () => {
       fd.append("custom_head", form.custom_head || "");
       if (image) {
         const p = getPreset(imgPreset);
-        const blob = await cropImageToSize(image, p.w, p.h);
+        const blob = await fitImageToSize(image, p.w, p.h);
         fd.append("image", blob, `cover-${p.id}.jpg`);
+      }
+      if (centerImage) {
+        // Keep the center image at its natural aspect ratio (only downscale
+        // very large files); never crop — "free size" as requested.
+        const blob = await fitImageToSize(centerImage, 2000, 2000);
+        fd.append("center_image", blob, "center.jpg");
+      } else if (removeCenter) {
+        fd.append("remove_center_image", "1");
       }
       if (editing) {
         fd.append("slug", editing.slug || "");
@@ -443,7 +458,7 @@ const AdminBlogs = () => {
                     src={imgPreview}
                     alt=""
                     style={{ aspectRatio: `${getPreset(imgPreset).w} / ${getPreset(imgPreset).h}` }}
-                    className="w-full max-h-48 object-cover rounded border border-slate-200"
+                    className="w-full max-h-48 object-contain bg-slate-100 rounded border border-slate-200"
                   />
                 </div>
               ) : (
@@ -455,11 +470,32 @@ const AdminBlogs = () => {
                 </div>
               )}
               <p className="text-[11px] text-slate-500 mb-2">
-                Image auto-crop hokar <b>{getPreset(imgPreset).w} × {getPreset(imgPreset).h}px</b> ({getPreset(imgPreset).note}) me save hoga.
+                Image poori dikhegi (crop nahi) — {getPreset(imgPreset).w} × {getPreset(imgPreset).h}px ke andar fit hokar save hogi.
               </p>
               <input type="file" accept="image/*" onChange={(e) => pickImage(e.target.files?.[0] || null)}
                 className="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                 data-testid="admin-blog-image" />
+            </div>
+          </div>
+
+          {/* Center image (optional, free size) */}
+          <div className="bg-white rounded border border-slate-200 shadow-sm" data-testid="center-image-box">
+            <div className="px-4 py-2.5 border-b border-slate-200 font-semibold text-slate-800 text-sm flex items-center gap-2"><FaImage className="text-emerald-600" /> Center image <span className="text-[11px] font-normal text-slate-400">(optional)</span></div>
+            <div className="p-4">
+              {centerPreview ? (
+                <div className="mb-3">
+                  <img src={centerPreview} alt="" className="w-full max-h-56 object-contain bg-slate-100 rounded border border-slate-200" data-testid="admin-blog-center-preview" />
+                  <button type="button" onClick={clearCenter} className="mt-2 text-[12px] font-semibold text-red-600 hover:underline" data-testid="admin-blog-center-remove">Remove center image</button>
+                </div>
+              ) : (
+                <div className="mb-3 rounded border border-dashed border-slate-300 grid place-items-center text-slate-300 h-28"><FaImage className="text-3xl" /></div>
+              )}
+              <p className="text-[11px] text-slate-500 mb-2">
+                Post ke beech me dikhne wali image — apni original size/aspect me (crop nahi). Optional hai.
+              </p>
+              <input type="file" accept="image/*" onChange={(e) => pickCenter(e.target.files?.[0] || null)}
+                className="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                data-testid="admin-blog-center-image" />
             </div>
           </div>
         </div>

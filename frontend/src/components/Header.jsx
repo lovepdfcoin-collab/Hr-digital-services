@@ -44,7 +44,7 @@ const Header = () => {
   ];
 
   return (
-    <>
+    <header className="sticky top-0 z-50" data-testid="site-header">
       {/* ─────────── Top Strip ─────────── */}
       <div className="top-strip" data-testid="top-strip">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
@@ -95,7 +95,7 @@ const Header = () => {
       </div>
 
       {/* ─────────── Sub Nav ─────────── */}
-      <nav className="subnav sticky top-0 z-40 hidden lg:block" data-testid="main-nav">
+      <nav className="subnav hidden lg:block" data-testid="main-nav">
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-2">
           {primaryLinks.map(l => {
             const Icon = l.icon;
@@ -156,7 +156,7 @@ const Header = () => {
           </a>
         </div>
       )}
-    </>
+    </header>
   );
 };
 

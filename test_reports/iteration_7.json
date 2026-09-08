@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 7 — end-to-end verification of the 9 copied features (branding auto-replace, manual lock, search without filter, sticky navbar, image object-contain, RTE pre-fill, working TOC, admin Views column, blog center image). Backend pytest (/app/backend/tests/test_nine_features.py) 6/6 PASSED including branding-across-all-vacancies, PDF href preservation, manual edit surviving POST /api/admin/vacancies/refresh, q=result surfacing admit_card/result while default view still excludes them, and blog center_image_url create/update/remove_center_image=1/re-upload full cycle. Frontend Playwright: (4) site-header has position:sticky top:0 z:50 and stays at top:0 after 1200px scroll; (5) HeroCarousel and BlogDetail featured image + Blogs card thumbnails + AdminSlides thumbnails all use object-contain (code + runtime confirmed where slides/images exist); (6) RichTextEditor for Vacancy edit and Blog edit both pre-fill existing content on open; (7) blog with 'Table of Contents | ...' block renders <nav class=post-toc> with 5 <a.post-toc-link> smooth-scroll anchors and duplicate raw TOC text is removed from the article body; (8) /admin/vacancies renders a Views column with data-testid=admin-vac-views-<id> for every manual post (5/5 rows showed the count); (9) admin blog form exposes admin-blog-center-image file input and public BlogDetail renders data-testid=blog-center-image when center_image_url is set (backend confirmed the field is saved).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_nine_features.py",
+    "/app/test_reports/pytest/nine_features.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 2468 lines — consider splitting (blogs / vacancies / admin / auth) into modules; violates the >700-line guideline.",
+    "AdminBlogs.jsx (508 lines) contains its own bespoke contentEditable + SEO analyzer instead of reusing components/RichTextEditor.jsx — duplicated 60+ lines of editor UI/exec logic. Should share the RichTextEditor for consistency and single-source pre-fill behavior.",
+    "/api/admin/blogs and /api/admin/blogs/{id} take 12+ Form fields — Pydantic model + FastAPI Form(...) alias struct would tighten validation; currently truncation is done manually and duplicated across create/update.",
+    "buildTableOfContents (htmlContent.js) walks the DOM up to 4 times with different querySelectorAll passes; fine for now but could be memoized per-blog to reduce reflow on very long scraped articles."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_nine_features.py"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (all 9 features validated)"},
+  "test_credentials": "Admin: hrdigitalservices.in@gmail.com / Dev@3642 (from backend/.env, matches request; iteration_6 note about admin@haryanaenterprises.com is stale)",
+  "seed_data_creation": "Test blog 'TEST TOC Blog' created + deleted for feature-7 verification. Test manual vacancy title 'TEST_MANUAL_LOCK_<hex>' was left in place because pre-existing manual promotion is required to prove the lock. Backend test also creates TEST_CENTERIMG_<hex> blog and deletes it.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Nine-features regression pytest at /app/backend/tests/test_nine_features.py. Env-var REACT_APP_BACKEND_URL must be exported before pytest (frontend/.env). Admin creds live only in backend/.env — do NOT use the stale creds from earlier iterations. Auth is Bearer token from /api/auth/login. Blog list uses data-testid=admin-add-blog-btn (not admin-blogs-add-btn) and blog edit uses admin-edit-blog-<id>; AdminBlogs uses its own content editor (admin-blog-content-editor), while VacancyForm uses the shared rte-editor testid.",
+  "rca_of_the_issue": "No defects found. All 9 features work end-to-end and existing flows are unaffected."
+}

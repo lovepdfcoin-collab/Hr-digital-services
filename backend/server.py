@@ -34,7 +34,7 @@ from auth import (
 )
 from emails import send_email, send_email_async, render_confirmation, render_reset
 from csc_services import CSC_CATEGORIES, all_service_ids, find_service
-from scrapers import fetch_freejobalert, refresh_vacancies_into_db, fetch_article_detail, backfill_application_mode, is_expired, parse_last_date, state_from_text, _cat_from_title, _dedupe_key, clean_promo_html, _is_junk_link
+from scrapers import fetch_freejobalert, refresh_vacancies_into_db, fetch_article_detail, backfill_application_mode, is_expired, parse_last_date, state_from_text, _cat_from_title, _dedupe_key, clean_promo_html, _is_junk_link, apply_brand, brand_html
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # MongoDB
@@ -694,7 +694,10 @@ async def list_vacancies(
     # those categories. This applies to the default "All" view AND every
     # other category (including haryana / state filters) so admit-card items
     # never leak into a normal job-browsing session.
-    if category not in ("admit_card", "result"):
+    # EXCEPTION: when the user is running a text search (`q`), search across
+    # ALL categories (including admit_card/result) so a matching post surfaces
+    # even without selecting its category filter.
+    if not q and category not in ("admit_card", "result"):
         existing = query.get("category")
         if isinstance(existing, dict):
             existing["$nin"] = list(set(existing.get("$nin", []) + ["admit_card", "result"]))
@@ -1810,11 +1813,15 @@ async def admin_create_blog(
     seo_description: str = Form(""),
     custom_head: str = Form(""),
     image: Optional[UploadFile] = File(None),
+    center_image: Optional[UploadFile] = File(None),
     _=Depends(require_admin),
 ):
     image_url = ""
     if image and image.filename:
         image_url, _ = await _save_public_file(image, BLOG_IMAGE_MIME)
+    center_image_url = ""
+    if center_image and center_image.filename:
+        center_image_url, _ = await _save_public_file(center_image, BLOG_IMAGE_MIME)
     now = datetime.now(timezone.utc)
     doc = {
         "title": title.strip()[:250],
@@ -1823,6 +1830,7 @@ async def admin_create_blog(
         "content": content,
         "status": status if status in ("published", "draft") else "published",
         "image_url": image_url,
+        "center_image_url": center_image_url,
         "categories": _csv_list(categories),
         "tags": _csv_list(tags),
         "focus_keyword": focus_keyword.strip()[:120],
@@ -2000,6 +2008,8 @@ async def admin_update_blog(
     seo_description: str = Form(""),
     custom_head: str = Form(""),
     image: Optional[UploadFile] = File(None),
+    center_image: Optional[UploadFile] = File(None),
+    remove_center_image: str = Form(""),
     _=Depends(require_admin),
 ):
     try:
@@ -2026,6 +2036,10 @@ async def admin_update_blog(
         update["slug"] = _slugify(slug)
     if image and image.filename:
         update["image_url"], _ = await _save_public_file(image, BLOG_IMAGE_MIME)
+    if center_image and center_image.filename:
+        update["center_image_url"], _ = await _save_public_file(center_image, BLOG_IMAGE_MIME)
+    elif remove_center_image.strip().lower() in ("1", "true", "yes"):
+        update["center_image_url"] = ""
     await db.blogs.update_one({"_id": oid}, {"$set": update})
     updated = await db.blogs.find_one({"_id": oid})
     return doc_public(updated)
@@ -2228,6 +2242,41 @@ async def startup():
             log.info(f"[startup] Promo cleanup done on {cleaned} scraped vacancies")
     except Exception as e:
         log.warning(f"promo cleanup backfill failed: {e}")
+
+    # One-time backfill: strip source branding ("FreeJobAlert" etc.) from
+    # already-stored scraped posts so old posts also carry our own brand.
+    try:
+        flag = await db.settings.find_one({"_id": "brand_applied_v1"})
+        if not flag:
+            branded = 0
+            async for v in db.vacancies.find(
+                {"source": {"$ne": "manual"}},
+                {"title": 1, "post_name": 1, "organization": 1, "row_text": 1,
+                 "heading": 1, "description": 1, "content_html": 1,
+                 "seo_title": 1, "seo_description": 1, "original_title": 1,
+                 "original_description": 1},
+            ):
+                update = {}
+                for f in ("title", "post_name", "organization", "row_text", "heading",
+                          "description", "seo_title", "seo_description",
+                          "original_title", "original_description"):
+                    val = v.get(f)
+                    if val:
+                        nb = apply_brand(val)
+                        if nb != val:
+                            update[f] = nb
+                html = v.get("content_html")
+                if html:
+                    nh = brand_html(html)
+                    if nh != html:
+                        update["content_html"] = nh
+                if update:
+                    await db.vacancies.update_one({"_id": v["_id"]}, {"$set": update})
+                    branded += 1
+            await db.settings.update_one({"_id": "brand_applied_v1"}, {"$set": {"at": datetime.now(timezone.utc), "branded": branded}}, upsert=True)
+            log.info(f"[startup] Brand replacement done on {branded} scraped vacancies")
+    except Exception as e:
+        log.warning(f"brand backfill failed: {e}")
 
     # One-time backfill: dedupe_key on existing vacancies so the 2nd source
     # (Haryana DC Rate/HKRN) can never create duplicate posts.

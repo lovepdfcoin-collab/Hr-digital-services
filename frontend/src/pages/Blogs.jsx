@@ -52,7 +52,7 @@ const Blogs = () => {
               data-testid={`blog-card-${b.slug}`}
             >
               {b.image_url ? (
-                <img src={`${BACKEND}${b.image_url}`} alt={b.title} className="w-full h-44 object-cover" loading="lazy" />
+                <img src={`${BACKEND}${b.image_url}`} alt={b.title} className="w-full h-44 object-contain bg-slate-900/40" loading="lazy" />
               ) : (
                 <div className="w-full h-44 bg-gradient-to-br from-emerald-900/60 to-slate-900 grid place-items-center">
                   <FaNewspaper className="text-4xl text-emerald-500/40" />

@@ -8,15 +8,19 @@ import { FaBold, FaItalic, FaListUl, FaLink, FaUnlink } from "react-icons/fa";
  */
 const RichTextEditor = ({ value, onChange, placeholder = "" }) => {
   const ref = useRef(null);
-  const inited = useRef(false);
 
-  // Initialise the DOM from `value` exactly ONCE (first mount / first non-empty
-  // load). After that the contentEditable DOM is the single source of truth —
-  // we never write innerHTML again, so re-renders can't wipe the user's typing.
+  // Keep the contentEditable DOM in sync with `value` whenever it changes
+  // EXTERNALLY (e.g. the edit form pre-fills an existing post's description a
+  // tick after mount). We only write when the editor is NOT focused and the
+  // incoming HTML differs from what's already shown — this fixes the "blank
+  // Description on edit" bug while never wiping the user's in-progress typing
+  // (their own keystrokes emit the same value back, so it's a no-op).
   useEffect(() => {
-    if (!ref.current || inited.current) return;
-    ref.current.innerHTML = value || "";
-    inited.current = true;
+    if (!ref.current) return;
+    const incoming = value || "";
+    if (incoming !== ref.current.innerHTML && document.activeElement !== ref.current) {
+      ref.current.innerHTML = incoming;
+    }
   }, [value]);
 
   const emit = () => {

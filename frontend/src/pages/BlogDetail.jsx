@@ -55,7 +55,7 @@ const BlogDetail = () => {
       </Link>
 
       {blog.image_url && (
-        <img src={`${BACKEND}${blog.image_url}`} alt={blog.title} className="w-full h-64 sm:h-80 object-cover rounded-2xl my-6 border border-white/10" />
+        <img src={`${BACKEND}${blog.image_url}`} alt={blog.title} className="w-full h-auto max-h-[32rem] object-contain rounded-2xl my-6 border border-white/10 bg-slate-900/40" />
       )}
 
       <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-white leading-tight" data-testid="blog-detail-title">{blog.title}</h1>
@@ -70,6 +70,16 @@ const BlogDetail = () => {
       <SocialShare title={blog.title} text={blog.excerpt || ""} lang={lang} className="mt-4" />
 
       <article className="vacancy-article mt-8" dangerouslySetInnerHTML={{ __html: enhanceHtml(blog.content) }} data-testid="blog-detail-content" />
+
+      {blog.center_image_url && (
+        <figure className="my-8 flex justify-center" data-testid="blog-center-image">
+          <img
+            src={`${BACKEND}${blog.center_image_url}`}
+            alt={blog.title}
+            className="max-w-full h-auto rounded-2xl border border-white/10"
+          />
+        </figure>
+      )}
 
       <div className="glass mt-12 p-6 text-center !border-[#25D366]/40">
         <h3 className="font-display text-xl font-bold text-white mb-2">
