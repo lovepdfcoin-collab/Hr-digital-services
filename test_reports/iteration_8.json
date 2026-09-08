@@ -1,0 +1,22 @@
+{
+  "summary": "Verified TOC bug fix on two seeded vacancies + regression on a normal vacancy. All three assertions pass: (1) BOB 'Table Of Contents' variant renders exactly 1 nav.post-toc with 11 pill links, no leftover raw TOC text after nav, no .jump-nav-mobile/.jump-mobile-list/.jump-nav-desktop remain. (2) 'On this Page' variant renders exactly 1 nav.post-toc with 6 pills, first pill text is 'Overview' (not 'On this Page: Overview'), raw duplicate 'On this Page' block gone, .jump-nav-mobile/.jump-mobile-list absent. (3) Smooth scroll works — clicking 'Eligibility' pill on BOB page scrolled window from y=0 to y=3312 (delta 3312px). Regression: a normal vacancy (/vacancies/6a9fe1653a79a38e4830a1f6) renders normally, has content, no crashes, no errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": ["Delete the two temporary TOC_TEST seed vacancies (6a9fe5c1a46f1475d75e8df8, 6a9fe6f749dc70d1d18f0453) once verification is complete, as noted in the review request."],
+  "critical_code_review_comments": [
+    "htmlContent.js buildTableOfContents fix is correct and defensive: matches both title variants (TOC_TITLE_RE) and source classes (TOC_CLASS_RE) so mobile <details class='jump-nav-mobile'> blocks and 'On this Page' labels are both handled.",
+    "Note: on the OnThisPage seed the raw jump-mobile <details> is fully removed; on BOB seed all 11 section pills resolve to real headings.",
+    "Minor: /api/site-settings/public returns 401 in console for anonymous users (unrelated to this bug, but repeated on every page load) — not blocking."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "seed_data_creation": "Two seed test vacancies (6a9fe5c1a46f1475d75e8df8 BOB, 6a9fe6f749dc70d1d18f0453 OnThisPage) were pre-inserted by main agent; verified their content renders correctly. Main agent should clean them up.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "TOC dedupe fix verified. Test URLs: /vacancies/6a9fe5c1a46f1475d75e8df8 (BOB / 11 links), /vacancies/6a9fe6f749dc70d1d18f0453 (OnThisPage / 6 links). Verify via DOM: postTocCount==1, jumpNavMobile/jumpMobileList/jumpNavDesktop all == 0, no 'Table of Contents' or 'On this Page' text after the nav element."
+}

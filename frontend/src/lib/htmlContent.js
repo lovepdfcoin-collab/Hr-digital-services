@@ -84,6 +84,11 @@ function buildTableOfContents(root, doc) {
   // articles sometimes carry more than one (e.g. an anchor list + a plain
   // "Table Of Contents" heading followed by a space-separated label line).
   const TOC_HINT = /overview|important dates|eligibility|how to apply|selection|age limit|vacanc/i;
+  // A TOC block's title varies across sources: "Table Of Contents", "On This
+  // Page", "In This Article", "Contents", "Index", etc.
+  const TOC_TITLE_RE = /^[\s▼▲►▸▾▿◂◃‣·•\-]*(?:table\s+of\s+contents|on\s+this\s+page|in\s+this\s+(?:article|post|page)|contents|index|jump\s+to)\s*:?/i;
+  // Source site wraps its jump-links in stable classes regardless of the label.
+  const TOC_CLASS_RE = /jump-nav|jump-mobile|(?:^|[\s_-])toc(?:[\s_-]|$)/i;
   const SECTION_WORDS = ["overview", "important date", "vacanc", "eligibil", "salary", "fee", "age limit", "selection", "how to apply", "instruction", "link"];
   const looksLikeTocList = (el) => {
     if (!el) return false;
@@ -98,8 +103,9 @@ function buildTableOfContents(root, doc) {
     const t = (el.textContent || "").trim();
     const low = t.toLowerCase();
     const pipes = (t.match(/\|/g) || []).length;
-    const startsToc = /^[\s▼▲►▸▾▿◂◃‣·•\-]*table\s+of\s+contents/i.test(low) && low.length < 900;
-    const isPipeList = pipes >= 3 && TOC_HINT.test(low) && low.length < 900;
+    const hasTocClass = TOC_CLASS_RE.test(el.className || "");
+    const startsToc = (TOC_TITLE_RE.test(low) || hasTocClass) && low.length < 1200;
+    const isPipeList = pipes >= 3 && TOC_HINT.test(low) && low.length < 1200;
     if (!startsToc && !isPipeList) continue;
     // Skip if an already-collected source contains this one (avoid nesting dupes)
     if (sources.some((s) => s.contains(el) || el.contains(s))) {
@@ -115,7 +121,7 @@ function buildTableOfContents(root, doc) {
 
   // 3) Parse the best set of labels from the sources.
   const parseLabels = (text) => {
-    const raw = (text || "").replace(/^[\s▼▲►▸▾▿◂◃‣·•\-]*table\s+of\s+contents\s*:?/i, "").trim();
+    const raw = (text || "").replace(TOC_TITLE_RE, "").trim();
     if (!raw) return [];
     let parts;
     if (/\|/.test(raw)) parts = raw.split(/\s*\|\s*/);
@@ -130,7 +136,7 @@ function buildTableOfContents(root, doc) {
     const own = parseLabels(src.textContent);
     if (own.length > labels.length) labels = own;
     // A "Table Of Contents" heading often has the labels in the next sibling.
-    if (/^[\s▼▲►▸▾▿◂◃‣·•\-]*table\s+of\s+contents/i.test((src.textContent || "").trim().toLowerCase())) {
+    if (TOC_TITLE_RE.test((src.textContent || "").trim().toLowerCase()) || TOC_CLASS_RE.test(src.className || "")) {
       const next = src.nextElementSibling;
       if (next && looksLikeTocList(next)) {
         listSiblings.push(next);
